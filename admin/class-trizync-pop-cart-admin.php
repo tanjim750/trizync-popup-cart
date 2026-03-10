@@ -1,0 +1,611 @@
+<?php
+
+/**
+ * The admin-specific functionality of the plugin.
+ *
+ * @link       https://triizync.com
+ * @since      1.0.0
+ *
+ * @package    Trizync_Pop_Cart
+ * @subpackage Trizync_Pop_Cart/admin
+ */
+
+/**
+ * The admin-specific functionality of the plugin.
+ *
+ * Defines the plugin name, version, and two examples hooks for how to
+ * enqueue the admin-specific stylesheet and JavaScript.
+ *
+ * @package    Trizync_Pop_Cart
+ * @subpackage Trizync_Pop_Cart/admin
+ * @author     Trizync Solution <trizyncsolution@gmail.com>
+ */
+class Trizync_Pop_Cart_Admin {
+
+	/**
+	 * The ID of this plugin.
+	 *
+	 * @since    1.0.0
+	 * @access   private
+	 * @var      string    $plugin_name    The ID of this plugin.
+	 */
+	private $plugin_name;
+
+	/**
+	 * The version of this plugin.
+	 *
+	 * @since    1.0.0
+	 * @access   private
+	 * @var      string    $version    The current version of this plugin.
+	 */
+	private $version;
+
+	/**
+	 * Initialize the class and set its properties.
+	 *
+	 * @since    1.0.0
+	 * @param      string    $plugin_name       The name of this plugin.
+	 * @param      string    $version    The version of this plugin.
+	 */
+	public function __construct( $plugin_name, $version ) {
+
+		$this->plugin_name = $plugin_name;
+		$this->version = $version;
+
+	}
+
+	/**
+	 * Register the stylesheets for the admin area.
+	 *
+	 * @since    1.0.0
+	 */
+	public function enqueue_styles() {
+
+		/**
+		 * This function is provided for demonstration purposes only.
+		 *
+		 * An instance of this class should be passed to the run() function
+		 * defined in Trizync_Pop_Cart_Loader as all of the hooks are defined
+		 * in that particular class.
+		 *
+		 * The Trizync_Pop_Cart_Loader will then create the relationship
+		 * between the defined hooks and the functions defined in this
+		 * class.
+		 */
+
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/trizync-pop-cart-admin.css', array(), $this->version, 'all' );
+
+	}
+
+	/**
+	 * Register the JavaScript for the admin area.
+	 *
+	 * @since    1.0.0
+	 */
+	public function enqueue_scripts() {
+
+		/**
+		 * This function is provided for demonstration purposes only.
+		 *
+		 * An instance of this class should be passed to the run() function
+		 * defined in Trizync_Pop_Cart_Loader as all of the hooks are defined
+		 * in that particular class.
+		 *
+		 * The Trizync_Pop_Cart_Loader will then create the relationship
+		 * between the defined hooks and the functions defined in this
+		 * class.
+		 */
+
+		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/trizync-pop-cart-admin.js', array( 'jquery' ), $this->version, false );
+
+	}
+
+	/**
+	 * Register plugin settings.
+	 *
+	 * @since    1.0.0
+	 */
+	public function register_settings() {
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_ENABLED,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'absint',
+				'default'           => 1,
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_FIELDS,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_fields' ),
+				'default'           => wp_json_encode( $this->get_default_fields() ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_BRANDING,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_branding' ),
+				'default'           => wp_json_encode( $this->get_default_branding() ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_CTA_LABEL,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => __( 'Proceed to checkout', 'trizync-pop-cart' ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => __( 'Instant checkout', 'trizync-pop-cart' ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_HEADER_TITLE,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => __( 'Secure checkout', 'trizync-pop-cart' ),
+			)
+		);
+
+		add_settings_section(
+			'trizync_pop_cart_main',
+			__( 'General', 'trizync-pop-cart' ),
+			'__return_false',
+			'trizync-pop-cart'
+		);
+
+		add_settings_field(
+			'trizync_pop_cart_enabled',
+			__( 'Enable Pop Cart', 'trizync-pop-cart' ),
+			array( $this, 'render_enabled_field' ),
+			'trizync-pop-cart',
+			'trizync_pop_cart_main'
+		);
+
+		add_settings_section(
+			'trizync_pop_cart_fields',
+			__( 'Checkout Fields', 'trizync-pop-cart' ),
+			'__return_false',
+			'trizync-pop-cart'
+		);
+
+		add_settings_field(
+			'trizync_pop_cart_fields_manager',
+			'',
+			array( $this, 'render_fields_manager' ),
+			'trizync-pop-cart',
+			'trizync_pop_cart_fields'
+		);
+
+		add_settings_section(
+			'trizync_pop_cart_branding',
+			__( 'Branding & UI', 'trizync-pop-cart' ),
+			'__return_false',
+			'trizync-pop-cart'
+		);
+
+		add_settings_field(
+			'trizync_pop_cart_branding_manager',
+			__( 'Branding', 'trizync-pop-cart' ),
+			array( $this, 'render_branding_manager' ),
+			'trizync-pop-cart',
+			'trizync_pop_cart_branding'
+		);
+	}
+
+	/**
+	 * Add the settings page under Settings menu.
+	 *
+	 * @since    1.0.0
+	 */
+	public function add_settings_page() {
+		add_options_page(
+			__( 'Pop Cart Settings', 'trizync-pop-cart' ),
+			__( 'Pop Cart', 'trizync-pop-cart' ),
+			'manage_options',
+			'trizync-pop-cart',
+			array( $this, 'render_settings_page' )
+		);
+	}
+
+	/**
+	 * Render the enable/disable toggle.
+	 *
+	 * @since    1.0.0
+	 */
+	public function render_enabled_field() {
+		$value = (int) get_option( TRIZYNC_POP_CART_OPTION_ENABLED, 1 );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_ENABLED ); ?>" value="1" <?php checked( 1, $value ); ?> />
+			<?php esc_html_e( 'Enable popup checkout', 'trizync-pop-cart' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the settings page.
+	 *
+	 * @since    1.0.0
+	 */
+	public function render_settings_page() {
+		?>
+		<div class="wrap trizync-pop-cart-admin">
+			<?php
+			ob_start();
+			settings_errors();
+			ob_end_clean();
+			?>
+			<form method="post" action="options.php" class="trizync-pop-cart-admin__form">
+				<?php
+				settings_fields( 'trizync_pop_cart_settings' );
+				?>
+				<div class="trizync-pop-cart-admin__hero">
+				<div>
+					<p class="trizync-pop-cart-admin__eyebrow"><?php esc_html_e( 'Popup Checkout', 'trizync-pop-cart' ); ?></p>
+					<h1 class="trizync-pop-cart-admin__title"><?php esc_html_e( 'Pop Cart Settings', 'trizync-pop-cart' ); ?></h1>
+					<p class="trizync-pop-cart-admin__subtitle"><?php esc_html_e( 'Design your checkout flow, customize fields, and keep it lightning fast.', 'trizync-pop-cart' ); ?></p>
+				</div>
+				<div class="trizync-pop-cart-admin__status">
+					<select id="trizync-pop-cart-status" class="trizync-pop-cart-admin__status-select" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_ENABLED ); ?>">
+						<option value="1" <?php selected( 1, (int) get_option( TRIZYNC_POP_CART_OPTION_ENABLED, 1 ) ); ?>><?php esc_html_e( 'Active', 'trizync-pop-cart' ); ?></option>
+						<option value="0" <?php selected( 0, (int) get_option( TRIZYNC_POP_CART_OPTION_ENABLED, 1 ) ); ?>><?php esc_html_e( 'Disabled', 'trizync-pop-cart' ); ?></option>
+					</select>
+					<?php submit_button( __( 'Save Settings', 'trizync-pop-cart' ), 'primary trizync-pop-cart-admin__pill', 'submit', false, array( 'class' => 'trizync-pop-cart-admin__save' ) ); ?>
+				</div>
+			</div>
+				<div class="trizync-pop-cart-admin__grid">
+					<div class="trizync-pop-cart-admin__card">
+						<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'General', 'trizync-pop-cart' ); ?></h2>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Header eyebrow', 'trizync-pop-cart' ); ?></label>
+							<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW ); ?>" value="<?php echo esc_attr( get_option( TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW, __( 'Instant checkout', 'trizync-pop-cart' ) ) ); ?>">
+						</div>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Header title', 'trizync-pop-cart' ); ?></label>
+							<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_HEADER_TITLE ); ?>" value="<?php echo esc_attr( get_option( TRIZYNC_POP_CART_OPTION_HEADER_TITLE, __( 'Secure checkout', 'trizync-pop-cart' ) ) ); ?>">
+						</div>
+						<?php
+						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_branding' );
+						?>
+					</div>
+					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--fields">
+						<?php
+						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_fields' );
+						?>
+					</div>
+				</div>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render field manager UI.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_fields_manager() {
+		$raw    = get_option( TRIZYNC_POP_CART_OPTION_FIELDS, wp_json_encode( $this->get_default_fields() ) );
+		$fields = json_decode( $raw, true );
+		if ( ! is_array( $fields ) ) {
+			$fields = $this->get_default_fields();
+		}
+		?>
+		<div class="trizync-pop-cart-fields" data-fields-manager data-default-keys="<?php echo esc_attr( wp_json_encode( wp_list_pluck( $this->get_default_fields(), 'key' ) ) ); ?>">
+			<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_FIELDS ); ?>" value="<?php echo esc_attr( wp_json_encode( $fields ) ); ?>" data-fields-value>
+			<div class="trizync-pop-cart-fields__toolbar">
+				<div>
+					<p class="trizync-pop-cart-fields__title"><?php esc_html_e( 'Checkout Fields', 'trizync-pop-cart' ); ?></p>
+					<p class="trizync-pop-cart-fields__subtitle"><?php esc_html_e( 'Control which fields appear in the popup checkout.', 'trizync-pop-cart' ); ?></p>
+				</div>
+			</div>
+			<div class="trizync-pop-cart-fields__layout">
+				<div class="trizync-pop-cart-admin__card trizync-pop-cart-fields__pane" data-fields-setup>
+					<div class="trizync-pop-cart-fields__pane-head">
+						<p class="trizync-pop-cart-fields__pane-title"><?php esc_html_e( 'Field Setup', 'trizync-pop-cart' ); ?></p>
+						<label class="trizync-pop-cart-fields__toggle-inline">
+							<span class="trizync-pop-cart-fields__toggle-label"><?php esc_html_e( 'Enabled', 'trizync-pop-cart' ); ?></span>
+							<span class="trizync-pop-cart-fields__switch">
+								<input type="checkbox" data-selected-enabled>
+								<span class="trizync-pop-cart-fields__slider"></span>
+							</span>
+						</label>
+					</div>
+					<div class="trizync-pop-cart-fields__editor" data-fields-editor></div>
+					<div class="trizync-pop-cart-fields__footer">
+						<button type="button" class="button trizync-pop-cart-admin__pill" data-remove-selected><?php esc_html_e( 'Remove Field', 'trizync-pop-cart' ); ?></button>
+						<button type="button" class="button button-primary trizync-pop-cart-admin__pill" data-add-field><?php esc_html_e( 'Add Field', 'trizync-pop-cart' ); ?></button>
+					</div>
+				</div>
+				<div class="trizync-pop-cart-admin__card trizync-pop-cart-fields__pane trizync-pop-cart-fields__pane--preview" data-fields-preview-card>
+					<p class="trizync-pop-cart-fields__pane-title"><?php esc_html_e( 'Field Preview', 'trizync-pop-cart' ); ?></p>
+					<div class="trizync-pop-cart-fields__preview" data-fields-preview></div>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render branding manager UI.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_branding_manager() {
+		$branding = $this->get_branding_settings();
+		$cta_label = get_option( TRIZYNC_POP_CART_OPTION_CTA_LABEL, __( 'Proceed to checkout', 'trizync-pop-cart' ) );
+		?>
+		<div class="trizync-pop-cart-branding">
+			<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_BRANDING ); ?>" value="<?php echo esc_attr( wp_json_encode( $branding ) ); ?>" data-branding-value>
+			<div class="trizync-pop-cart-branding__grid">
+				<div>
+					<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Primary', 'trizync-pop-cart' ); ?></label>
+					<input type="color" class="trizync-pop-cart-branding__color" data-branding="primary" value="<?php echo esc_attr( $branding['primary'] ); ?>">
+				</div>
+				<div>
+					<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Secondary', 'trizync-pop-cart' ); ?></label>
+					<input type="color" class="trizync-pop-cart-branding__color" data-branding="secondary" value="<?php echo esc_attr( $branding['secondary'] ); ?>">
+				</div>
+				<div>
+					<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Tertiary', 'trizync-pop-cart' ); ?></label>
+					<input type="color" class="trizync-pop-cart-branding__color" data-branding="tertiary" value="<?php echo esc_attr( $branding['tertiary'] ); ?>">
+				</div>
+			</div>
+			<div class="trizync-pop-cart-branding__cta">
+				<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'CTA Label', 'trizync-pop-cart' ); ?></label>
+				<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_CTA_LABEL ); ?>" value="<?php echo esc_attr( $cta_label ); ?>">
+			</div>
+			<div class="trizync-pop-cart-branding__preview" data-branding-preview>
+				<div class="trizync-pop-cart-branding__preview-card">
+					<p class="trizync-pop-cart-branding__preview-label"><?php esc_html_e( 'Preview', 'trizync-pop-cart' ); ?></p>
+					<div class="trizync-pop-cart-branding__preview-header">
+						<div>
+							<p class="trizync-pop-cart-branding__preview-eyebrow" data-preview-eyebrow><?php echo esc_html( get_option( TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW, __( 'Instant checkout', 'trizync-pop-cart' ) ) ); ?></p>
+							<p class="trizync-pop-cart-branding__preview-title" data-preview-title><?php echo esc_html( get_option( TRIZYNC_POP_CART_OPTION_HEADER_TITLE, __( 'Secure checkout', 'trizync-pop-cart' ) ) ); ?></p>
+						</div>
+						<span class="trizync-pop-cart-branding__preview-dot"></span>
+					</div>
+					<button type="button" class="trizync-pop-cart-branding__preview-cta"><?php echo esc_html( $cta_label ); ?></button>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Sanitize fields JSON.
+	 *
+	 * @since 1.0.0
+	 * @param string $value
+	 * @return string
+	 */
+	public function sanitize_fields( $value ) {
+		$decoded = json_decode( $value, true );
+		if ( ! is_array( $decoded ) ) {
+			return wp_json_encode( $this->get_default_fields() );
+		}
+
+		$defaults = $this->get_default_fields();
+		$default_keys = array();
+		foreach ( $defaults as $default_field ) {
+			$default_keys[ $default_field['key'] ] = $default_field;
+		}
+
+		$clean = array();
+		foreach ( $decoded as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+			$key = isset( $field['key'] ) ? sanitize_key( $field['key'] ) : '';
+			if ( '' === $key ) {
+				continue;
+			}
+			$is_default = isset( $default_keys[ $key ] );
+			$clean[] = array(
+				'key'         => $key,
+				'label'       => isset( $field['label'] ) ? sanitize_text_field( $field['label'] ) : '',
+				'placeholder' => isset( $field['placeholder'] ) ? sanitize_text_field( $field['placeholder'] ) : '',
+				'default'     => isset( $field['default'] ) ? sanitize_text_field( $field['default'] ) : '',
+				'type'        => isset( $field['type'] ) ? sanitize_key( $field['type'] ) : 'text',
+				'options'     => isset( $field['options'] ) && is_array( $field['options'] ) ? array_map( 'sanitize_text_field', $field['options'] ) : array(),
+				'rule'        => isset( $field['rule'] ) ? sanitize_key( $field['rule'] ) : 'required',
+				'enabled'     => $is_default ? ( ! empty( $field['enabled'] ) ? 1 : 0 ) : ( ! empty( $field['enabled'] ) ? 1 : 0 ),
+				'order'       => isset( $field['order'] ) ? absint( $field['order'] ) : 0,
+			);
+		}
+
+		foreach ( $default_keys as $key => $default_field ) {
+			$found = false;
+			foreach ( $clean as $field ) {
+				if ( $field['key'] === $key ) {
+					$found = true;
+					break;
+				}
+			}
+			if ( ! $found ) {
+				$clean[] = $default_field;
+			}
+		}
+
+		return wp_json_encode( $clean );
+	}
+
+	/**
+	 * Sanitize branding settings.
+	 *
+	 * @since 1.0.0
+	 * @param string $value
+	 * @return string
+	 */
+	public function sanitize_branding( $value ) {
+		$decoded = json_decode( $value, true );
+		if ( ! is_array( $decoded ) ) {
+			return wp_json_encode( $this->get_default_branding() );
+		}
+
+		$clean = array(
+			'primary'   => isset( $decoded['primary'] ) ? sanitize_hex_color( $decoded['primary'] ) : '',
+			'secondary' => isset( $decoded['secondary'] ) ? sanitize_hex_color( $decoded['secondary'] ) : '',
+			'tertiary'  => isset( $decoded['tertiary'] ) ? sanitize_hex_color( $decoded['tertiary'] ) : '',
+		);
+
+		foreach ( $clean as $key => $value ) {
+			if ( empty( $value ) ) {
+				$defaults = $this->get_default_branding();
+				$clean[ $key ] = $defaults[ $key ];
+			}
+		}
+
+		return wp_json_encode( $clean );
+	}
+
+	/**
+	 * Default field definitions.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_default_fields() {
+		return array(
+			array(
+				'key'         => 'billing_first_name',
+				'label'       => __( 'Full Name', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Your full name', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 1,
+				'order'       => 1,
+			),
+			array(
+				'key'         => 'billing_phone',
+				'label'       => __( 'Phone', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Phone number', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 1,
+				'order'       => 2,
+			),
+			array(
+				'key'         => 'billing_email',
+				'label'       => __( 'Email', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Email address', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 1,
+				'order'       => 3,
+			),
+			array(
+				'key'         => 'billing_address_1',
+				'label'       => __( 'Address', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Street address', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 1,
+				'order'       => 4,
+			),
+			array(
+				'key'         => 'billing_city',
+				'label'       => __( 'City', 'trizync-pop-cart' ),
+				'placeholder' => __( 'City', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 0,
+				'order'       => 5,
+			),
+			array(
+				'key'         => 'billing_postcode',
+				'label'       => __( 'Postcode', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Postcode', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 0,
+				'order'       => 6,
+			),
+			array(
+				'key'         => 'billing_country',
+				'label'       => __( 'Country', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Country', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 0,
+				'order'       => 7,
+			),
+			array(
+				'key'         => 'billing_state',
+				'label'       => __( 'State', 'trizync-pop-cart' ),
+				'placeholder' => __( 'State', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 0,
+				'order'       => 8,
+			),
+		);
+	}
+
+	/**
+	 * Default branding values.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_default_branding() {
+		return array(
+			'primary'   => '#411264',
+			'secondary' => '#f0a60a',
+			'tertiary'  => '#ffffff',
+		);
+	}
+
+	/**
+	 * Get branding settings merged with defaults.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_branding_settings() {
+		$raw = get_option( TRIZYNC_POP_CART_OPTION_BRANDING, wp_json_encode( $this->get_default_branding() ) );
+		$decoded = json_decode( $raw, true );
+		if ( ! is_array( $decoded ) ) {
+			return $this->get_default_branding();
+		}
+
+		return array_merge( $this->get_default_branding(), $decoded );
+	}
+
+}
