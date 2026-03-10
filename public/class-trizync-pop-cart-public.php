@@ -316,11 +316,6 @@ class Trizync_Pop_Cart_Public {
 							<div class="trizync-pop-cart__payment-list" data-trizync-pop-cart-payment-list></div>
 						</div>
 					</div>
-					<div class="trizync-pop-cart__empty">
-						<div class="trizync-pop-cart__empty-icon" aria-hidden="true"></div>
-						<p class="trizync-pop-cart__placeholder"><?php esc_html_e( 'Popup shell loaded. Checkout UI will appear here in the next steps.', 'trizync-pop-cart' ); ?></p>
-						<p class="trizync-pop-cart__helper"><?php esc_html_e( 'We will load your cart, shipping, and payment methods without leaving the page.', 'trizync-pop-cart' ); ?></p>
-					</div>
 				</div>
 				<div class="trizync-pop-cart__footer">
 					<button type="button" class="trizync-pop-cart__cta" disabled="disabled"><?php echo esc_html( $this->get_cta_label() ); ?></button>
@@ -986,12 +981,14 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		ob_start();
 		do_action( 'trizync_pop_cart_backend_event', $context );
 
 		// Mirror WooCommerce update hooks used by plugins.
 		do_action( 'woocommerce_checkout_update_order_review', array( 'trizync_pop_cart' => true, 'context' => $context ) );
 		do_action( 'woocommerce_checkout_update_order_review_expired', array( 'trizync_pop_cart' => true, 'context' => $context ) );
 		do_action( 'woocommerce_cart_updated' );
+		ob_end_clean();
 	}
 
 	/**
@@ -1009,6 +1006,7 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		ob_start();
 		do_action( 'woocommerce_before_checkout_form', $checkout );
 		do_action( 'woocommerce_checkout_before_customer_details' );
 		do_action( 'woocommerce_checkout_billing' );
@@ -1018,6 +1016,7 @@ class Trizync_Pop_Cart_Public {
 		do_action( 'woocommerce_checkout_order_review' );
 		do_action( 'woocommerce_checkout_after_order_review' );
 		do_action( 'woocommerce_after_checkout_form', $checkout );
+		ob_end_clean();
 	}
 
 	/**
