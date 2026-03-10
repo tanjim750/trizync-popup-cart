@@ -189,7 +189,12 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'woocommerce_after_add_to_cart_button', $plugin_public, 'render_product_checkout_button' );
 		$this->loader->add_action( 'woocommerce_checkout_update_order_meta', $plugin_public, 'save_custom_order_meta', 10, 2 );
 		$this->loader->add_action( 'woocommerce_admin_order_data_after_billing_address', $plugin_public, 'render_admin_order_meta' );
+		$this->loader->add_action( 'woocommerce_order_data_after_billing_address', $plugin_public, 'render_admin_order_meta' );
 		$this->loader->add_action( 'woocommerce_checkout_order_processed', $plugin_public, 'handle_checkout_success', 10, 3 );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_prepare_product_checkout', $plugin_public, 'ajax_prepare_product_checkout' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_prepare_product_checkout', $plugin_public, 'ajax_prepare_product_checkout' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_restore_cart', $plugin_public, 'ajax_restore_cart' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_restore_cart', $plugin_public, 'ajax_restore_cart' );
 		$this->loader->add_filter( 'woocommerce_loop_add_to_cart_link', $plugin_public, 'decorate_loop_add_to_cart_link', 10, 2 );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );

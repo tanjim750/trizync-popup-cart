@@ -277,43 +277,49 @@ class Trizync_Pop_Cart_Public {
 					<button type="button" class="trizync-pop-cart__close" data-trizync-pop-cart-close aria-label="<?php esc_attr_e( 'Close popup', 'trizync-pop-cart' ); ?>">×</button>
 				</div>
 				<div class="trizync-pop-cart__body">
-					<div class="trizync-pop-cart__cart" data-trizync-pop-cart-cart hidden>
-						<p class="trizync-pop-cart__section-label" data-trizync-pop-cart-cart-label><?php esc_html_e( 'Cart items', 'trizync-pop-cart' ); ?></p>
-						<div class="trizync-pop-cart__cart-empty" data-trizync-pop-cart-empty>
-							<p class="trizync-pop-cart__cart-empty-title"><?php esc_html_e( 'Your cart is empty', 'trizync-pop-cart' ); ?></p>
-							<p class="trizync-pop-cart__cart-empty-text"><?php esc_html_e( 'Add items to your cart before checking out.', 'trizync-pop-cart' ); ?></p>
+					<div class="trizync-pop-cart__layout">
+						<div class="trizync-pop-cart__left">
+							<div class="trizync-pop-cart__cart" data-trizync-pop-cart-cart hidden>
+								<p class="trizync-pop-cart__section-label" data-trizync-pop-cart-cart-label><?php esc_html_e( 'Cart items', 'trizync-pop-cart' ); ?></p>
+								<div class="trizync-pop-cart__cart-empty" data-trizync-pop-cart-empty>
+									<p class="trizync-pop-cart__cart-empty-title"><?php esc_html_e( 'Your cart is empty', 'trizync-pop-cart' ); ?></p>
+									<p class="trizync-pop-cart__cart-empty-text"><?php esc_html_e( 'Add items to your cart before checking out.', 'trizync-pop-cart' ); ?></p>
+								</div>
+								<ul class="trizync-pop-cart__cart-list" data-trizync-pop-cart-list></ul>
+								<div class="trizync-pop-cart__shipping" data-trizync-pop-cart-shipping hidden>
+									<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Shipping method', 'trizync-pop-cart' ); ?></p>
+									<div class="trizync-pop-cart__shipping-empty" data-trizync-pop-cart-shipping-empty hidden>
+										<?php esc_html_e( 'No shipping methods available. Please add your address.', 'trizync-pop-cart' ); ?>
+									</div>
+									<div class="trizync-pop-cart__shipping-list" data-trizync-pop-cart-shipping-list></div>
+								</div>
+								<div class="trizync-pop-cart__cart-totals" data-trizync-pop-cart-totals hidden>
+									<div class="trizync-pop-cart__total-row trizync-pop-cart__total-row--shipping" data-trizync-pop-cart-shipping-row hidden>
+										<span><?php esc_html_e( 'Shipping', 'trizync-pop-cart' ); ?></span>
+										<strong data-trizync-pop-cart-shipping-total></strong>
+									</div>
+									<div class="trizync-pop-cart__total-row">
+										<span><?php esc_html_e( 'Subtotal', 'trizync-pop-cart' ); ?></span>
+										<strong data-trizync-pop-cart-subtotal></strong>
+									</div>
+									<div class="trizync-pop-cart__total-row trizync-pop-cart__total-row--grand">
+										<span><?php esc_html_e( 'Total', 'trizync-pop-cart' ); ?></span>
+										<strong data-trizync-pop-cart-total></strong>
+									</div>
+								</div>
+								<div class="trizync-pop-cart__payment" data-trizync-pop-cart-payment hidden>
+									<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Payment method', 'trizync-pop-cart' ); ?></p>
+									<div class="trizync-pop-cart__payment-empty" data-trizync-pop-cart-payment-empty hidden>
+										<?php esc_html_e( 'No payment methods available.', 'trizync-pop-cart' ); ?>
+									</div>
+									<div class="trizync-pop-cart__payment-list" data-trizync-pop-cart-payment-list></div>
+								</div>
+							</div>
 						</div>
-						<ul class="trizync-pop-cart__cart-list" data-trizync-pop-cart-list></ul>
-						<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout>
-							<?php $this->render_checkout_form(); ?>
-						</div>
-						<div class="trizync-pop-cart__shipping" data-trizync-pop-cart-shipping hidden>
-							<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Shipping method', 'trizync-pop-cart' ); ?></p>
-							<div class="trizync-pop-cart__shipping-empty" data-trizync-pop-cart-shipping-empty hidden>
-								<?php esc_html_e( 'No shipping methods available. Please add your address.', 'trizync-pop-cart' ); ?>
+						<div class="trizync-pop-cart__right">
+							<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout>
+								<?php $this->render_checkout_form(); ?>
 							</div>
-							<div class="trizync-pop-cart__shipping-list" data-trizync-pop-cart-shipping-list></div>
-						</div>
-						<div class="trizync-pop-cart__cart-totals" data-trizync-pop-cart-totals hidden>
-							<div class="trizync-pop-cart__total-row trizync-pop-cart__total-row--shipping" data-trizync-pop-cart-shipping-row hidden>
-								<span><?php esc_html_e( 'Shipping', 'trizync-pop-cart' ); ?></span>
-								<strong data-trizync-pop-cart-shipping-total></strong>
-							</div>
-							<div class="trizync-pop-cart__total-row">
-								<span><?php esc_html_e( 'Subtotal', 'trizync-pop-cart' ); ?></span>
-								<strong data-trizync-pop-cart-subtotal></strong>
-							</div>
-							<div class="trizync-pop-cart__total-row trizync-pop-cart__total-row--grand">
-								<span><?php esc_html_e( 'Total', 'trizync-pop-cart' ); ?></span>
-								<strong data-trizync-pop-cart-total></strong>
-							</div>
-						</div>
-						<div class="trizync-pop-cart__payment" data-trizync-pop-cart-payment hidden>
-							<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Payment method', 'trizync-pop-cart' ); ?></p>
-							<div class="trizync-pop-cart__payment-empty" data-trizync-pop-cart-payment-empty hidden>
-								<?php esc_html_e( 'No payment methods available.', 'trizync-pop-cart' ); ?>
-							</div>
-							<div class="trizync-pop-cart__payment-list" data-trizync-pop-cart-payment-list></div>
 						</div>
 					</div>
 				</div>
@@ -598,6 +604,9 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		$default_keys = $this->get_default_field_keys();
+		$order = wc_get_order( $order_id );
+
 		foreach ( $config as $field ) {
 			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
 				continue;
@@ -608,7 +617,7 @@ class Trizync_Pop_Cart_Public {
 				continue;
 			}
 
-			if ( 0 === strpos( $key, 'billing_' ) || 0 === strpos( $key, 'shipping_' ) ) {
+			if ( in_array( $key, $default_keys, true ) ) {
 				continue;
 			}
 
@@ -627,7 +636,15 @@ class Trizync_Pop_Cart_Public {
 				continue;
 			}
 
-			update_post_meta( $order_id, $key, $value );
+			if ( $order instanceof WC_Order ) {
+				$order->update_meta_data( $key, $value );
+			} else {
+				update_post_meta( $order_id, $key, $value );
+			}
+		}
+
+		if ( $order instanceof WC_Order ) {
+			$order->save();
 		}
 	}
 
@@ -638,6 +655,11 @@ class Trizync_Pop_Cart_Public {
 	 * @param WC_Order $order
 	 */
 	public function render_admin_order_meta( $order ) {
+		static $rendered = false;
+		if ( $rendered ) {
+			return;
+		}
+
 		if ( ! $order instanceof WC_Order ) {
 			return;
 		}
@@ -656,16 +678,17 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		$default_keys = $this->get_default_field_keys();
 		$items = array();
 		foreach ( $config as $field ) {
-			if ( empty( $field['key'] ) ) {
+			if ( empty( $field['key'] ) || empty( $field['enabled'] ) ) {
 				continue;
 			}
 			$key = sanitize_key( $field['key'] );
 			if ( '' === $key ) {
 				continue;
 			}
-			if ( 0 === strpos( $key, 'billing_' ) || 0 === strpos( $key, 'shipping_' ) ) {
+			if ( in_array( $key, $default_keys, true ) ) {
 				continue;
 			}
 			$value = $order->get_meta( $key );
@@ -683,6 +706,7 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		$rendered = true;
 		echo '<div class="trizync-pop-cart-admin__order-meta">';
 		echo '<h4>' . esc_html__( 'Popup Checkout Fields', 'trizync-pop-cart' ) . '</h4>';
 		echo '<ul>';
@@ -691,6 +715,25 @@ class Trizync_Pop_Cart_Public {
 		}
 		echo '</ul>';
 		echo '</div>';
+	}
+
+	/**
+	 * Default field keys (non-removable).
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_default_field_keys() {
+		return array(
+			'billing_first_name',
+			'billing_phone',
+			'billing_email',
+			'billing_address_1',
+			'billing_city',
+			'billing_postcode',
+			'billing_country',
+			'billing_state',
+		);
 	}
 
 	/**
@@ -720,6 +763,8 @@ class Trizync_Pop_Cart_Public {
 		}
 
 		do_action( 'trizync_pop_cart_order_success', $order_id, $order );
+
+		$this->restore_cart_snapshot();
 	}
 
 	/**
@@ -919,6 +964,62 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * AJAX: Prepare single product checkout (replace cart).
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_prepare_product_checkout() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		$this->ensure_cart_loaded();
+
+		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+		$quantity   = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
+
+		if ( ! $product_id ) {
+			wp_send_json_error( array( 'message' => 'missing_product' ), 400 );
+		}
+
+		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
+			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
+		}
+
+		$this->snapshot_cart();
+		WC()->cart->empty_cart( true );
+		WC()->cart->add_to_cart( $product_id, max( 1, $quantity ) );
+		WC()->cart->calculate_totals();
+
+		WC()->session->set( 'trizync_pop_cart_product_checkout', 1 );
+
+		$this->trigger_backend_checkout_hooks( 'prepare_product_checkout' );
+		wp_send_json_success( $this->build_cart_payload() );
+	}
+
+	/**
+	 * AJAX: Restore cart after single product checkout flow.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_restore_cart() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		$this->ensure_cart_loaded();
+
+		$this->restore_cart_snapshot();
+
+		$this->trigger_backend_checkout_hooks( 'restore_cart' );
+		wp_send_json_success( $this->build_cart_payload() );
+	}
+
+	/**
 	 * Build cart payload for AJAX responses.
 	 *
 	 * @since 1.0.0
@@ -968,6 +1069,73 @@ class Trizync_Pop_Cart_Public {
 			'hash'      => WC()->cart->get_cart_hash(),
 			'itemCount' => WC()->cart->get_cart_contents_count(),
 		);
+	}
+
+	/**
+	 * Snapshot current cart to session for single product checkout.
+	 *
+	 * @since 1.0.0
+	 */
+	private function snapshot_cart() {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
+			return;
+		}
+
+		if ( WC()->session->get( 'trizync_pop_cart_snapshot' ) ) {
+			return;
+		}
+
+		$items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item ) {
+			if ( empty( $cart_item['product_id'] ) ) {
+				continue;
+			}
+			$items[] = array(
+				'product_id'     => (int) $cart_item['product_id'],
+				'variation_id'   => isset( $cart_item['variation_id'] ) ? (int) $cart_item['variation_id'] : 0,
+				'variation'      => isset( $cart_item['variation'] ) ? $cart_item['variation'] : array(),
+				'quantity'       => isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 1,
+				'cart_item_data' => isset( $cart_item['cart_item_data'] ) ? $cart_item['cart_item_data'] : array(),
+			);
+		}
+
+		WC()->session->set( 'trizync_pop_cart_snapshot', $items );
+	}
+
+	/**
+	 * Restore cart snapshot if available.
+	 *
+	 * @since 1.0.0
+	 */
+	private function restore_cart_snapshot() {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
+			return;
+		}
+
+		$flag = WC()->session->get( 'trizync_pop_cart_product_checkout' );
+		$snapshot = WC()->session->get( 'trizync_pop_cart_snapshot' );
+
+		if ( ! $flag || empty( $snapshot ) || ! is_array( $snapshot ) ) {
+			return;
+		}
+
+		WC()->cart->empty_cart( true );
+		foreach ( $snapshot as $item ) {
+			$product_id     = isset( $item['product_id'] ) ? (int) $item['product_id'] : 0;
+			$variation_id   = isset( $item['variation_id'] ) ? (int) $item['variation_id'] : 0;
+			$variation      = isset( $item['variation'] ) && is_array( $item['variation'] ) ? $item['variation'] : array();
+			$quantity       = isset( $item['quantity'] ) ? (int) $item['quantity'] : 1;
+			$cart_item_data = isset( $item['cart_item_data'] ) && is_array( $item['cart_item_data'] ) ? $item['cart_item_data'] : array();
+
+			if ( $product_id ) {
+				WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $variation, $cart_item_data );
+			}
+		}
+
+		WC()->cart->calculate_totals();
+
+		WC()->session->__unset( 'trizync_pop_cart_product_checkout' );
+		WC()->session->__unset( 'trizync_pop_cart_snapshot' );
 	}
 
 	/**

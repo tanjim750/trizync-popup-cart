@@ -86,6 +86,8 @@
 		var currentMode = 'cart';
 		var currentProductId = 0;
 		var currentProductQty = 1;
+		var lastItemCount = 0;
+		var productCheckoutPrepared = false;
 
 		function renderCart( payload ) {
 			var popup = getPopup();
@@ -127,6 +129,7 @@
 				cartLabel.textContent = 'Cart items';
 			}
 
+			lastItemCount = payload && payload.itemCount ? payload.itemCount : 0;
 			if ( ! payload || ! payload.items || payload.items.length === 0 ) {
 				if ( currentMode === 'cart' ) {
 					empty.hidden = false;
@@ -354,6 +357,11 @@
 			}
 			var form = popup.querySelector( 'form.woocommerce-checkout' );
 			if ( ! form ) {
+				cta.disabled = true;
+				return;
+			}
+
+			if ( lastItemCount < 1 ) {
 				cta.disabled = true;
 				return;
 			}
@@ -605,6 +613,9 @@
 			}
 
 			currentMode = type || 'cart';
+			if ( currentMode !== 'product' ) {
+				productCheckoutPrepared = false;
+			}
 
 			if ( type === 'product' ) {
 				var qty = button.getAttribute( 'data-quantity' ) || '1';
@@ -612,6 +623,7 @@
 
 				currentProductId = parseInt( productId, 10 ) || 0;
 				currentProductQty = parseInt( qty, 10 ) || 1;
+				productCheckoutPrepared = false;
 			}
 
 			if ( cart ) {
@@ -744,6 +756,28 @@
 			if ( placeOrder ) {
 				placeOrder.value = '1';
 			}
+			if ( currentMode === 'product' && currentProductId && ! productCheckoutPrepared ) {
+				$.post(
+					TrizyncPopCart.ajaxUrl,
+					{
+						action: 'trizync_pop_cart_prepare_product_checkout',
+						nonce: TrizyncPopCart.nonce,
+						product_id: currentProductId,
+						quantity: currentProductQty
+					}
+				).done( function( response ) {
+					if ( response && response.success ) {
+						productCheckoutPrepared = true;
+						if ( typeof form.requestSubmit === 'function' ) {
+							form.requestSubmit();
+						} else {
+							form.submit();
+						}
+					}
+				} );
+				return;
+			}
+
 			if ( typeof form.requestSubmit === 'function' ) {
 				form.requestSubmit();
 			} else {
@@ -849,6 +883,17 @@
 		$( document ).on( 'click', '[data-trizync-pop-cart-close]', function( event ) {
 			event.preventDefault();
 			closePopup();
+			if ( currentMode === 'product' && productCheckoutPrepared ) {
+				$.post(
+					TrizyncPopCart.ajaxUrl,
+					{
+						action: 'trizync_pop_cart_restore_cart',
+						nonce: TrizyncPopCart.nonce
+					}
+				).always( function() {
+					productCheckoutPrepared = false;
+				} );
+			}
 		} );
 	} );
 
