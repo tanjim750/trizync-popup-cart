@@ -231,9 +231,7 @@
 
 			renderShipping( payload.shipping );
 			renderPayment( payload.payment );
-			if ( cta ) {
-				cta.disabled = false;
-			}
+			updateCtaState();
 		}
 
 		function fetchCart( showOverlay ) {
@@ -312,6 +310,54 @@
 				}
 				isFetchingCart = false;
 			} );
+		}
+
+		function isFieldFilled( field ) {
+			if ( ! field ) {
+				return false;
+			}
+			if ( field.type === 'checkbox' || field.type === 'radio' ) {
+				var group = field.name ? field.form.querySelectorAll( '[name="' + field.name + '"]' ) : [ field ];
+				return Array.prototype.some.call( group, function( input ) {
+					return input.checked;
+				} );
+			}
+			return field.value && field.value.toString().trim().length > 0;
+		}
+
+		function updateCtaState() {
+			var popup = getPopup();
+			if ( ! popup ) {
+				return;
+			}
+			var cta = popup.querySelector( '.trizync-pop-cart__cta' );
+			if ( ! cta ) {
+				return;
+			}
+			var form = popup.querySelector( 'form.woocommerce-checkout' );
+			if ( ! form ) {
+				cta.disabled = true;
+				return;
+			}
+
+			var requiredFields = form.querySelectorAll( '.validate-required input, .validate-required select, .validate-required textarea, input[required], select[required], textarea[required]' );
+			var allFilled = true;
+			Array.prototype.some.call( requiredFields, function( field ) {
+				if ( field.disabled || field.closest( '.woocommerce-input-wrapper' )?.classList.contains( 'hidden' ) ) {
+					return false;
+				}
+				if ( ! isFieldFilled( field ) ) {
+					allFilled = false;
+					return true;
+				}
+				return false;
+			} );
+
+			if ( allFilled ) {
+				cta.disabled = false;
+			} else {
+				cta.disabled = true;
+			}
 		}
 
 		function updateCartItem( key, quantity ) {
@@ -771,6 +817,10 @@
 				}
 			}
 			setPaymentMethod( this.value );
+		} );
+
+		$( document ).on( 'input change', '.woocommerce-checkout input, .woocommerce-checkout select, .woocommerce-checkout textarea', function() {
+			updateCtaState();
 		} );
 
 		$( document ).on( 'click', '[data-trizync-pop-cart-close]', function( event ) {
