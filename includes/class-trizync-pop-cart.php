@@ -189,6 +189,7 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'woocommerce_after_add_to_cart_button', $plugin_public, 'render_product_checkout_button' );
 		$this->loader->add_action( 'woocommerce_checkout_update_order_meta', $plugin_public, 'save_custom_order_meta', 10, 2 );
 		$this->loader->add_action( 'woocommerce_admin_order_data_after_billing_address', $plugin_public, 'render_admin_order_meta' );
+		$this->loader->add_action( 'woocommerce_checkout_order_processed', $plugin_public, 'handle_checkout_success', 10, 3 );
 		$this->loader->add_filter( 'woocommerce_loop_add_to_cart_link', $plugin_public, 'decorate_loop_add_to_cart_link', 10, 2 );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );

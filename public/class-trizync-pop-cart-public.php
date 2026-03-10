@@ -699,6 +699,35 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * Trigger success hooks after checkout is processed (excluding thank you).
+	 *
+	 * @since 1.0.0
+	 * @param int   $order_id
+	 * @param array $posted_data
+	 * @param WC_Order $order
+	 */
+	public function handle_checkout_success( $order_id, $posted_data, $order ) {
+		if ( ! $order_id ) {
+			return;
+		}
+
+		$order = $order instanceof WC_Order ? $order : wc_get_order( $order_id );
+		if ( ! $order ) {
+			return;
+		}
+
+		// Core success hooks commonly fired on successful checkout (exclude thank you).
+		if ( 0 === did_action( 'woocommerce_checkout_order_created' ) ) {
+			do_action( 'woocommerce_checkout_order_created', $order );
+		}
+		if ( 0 === did_action( 'woocommerce_payment_complete' ) ) {
+			do_action( 'woocommerce_payment_complete', $order_id );
+		}
+
+		do_action( 'trizync_pop_cart_order_success', $order_id, $order );
+	}
+
+	/**
 	 * Get cart quantity for a product.
 	 *
 	 * @since 1.0.0
