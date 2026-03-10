@@ -302,6 +302,12 @@
 		}
 		var $hidden = $( '[data-branding-value]' );
 		var $inputs = $( '[data-branding]' );
+		var $previewEyebrow = $( '[data-preview-eyebrow]' );
+		var $previewTitle = $( '[data-preview-title]' );
+		var $previewCta = $branding.find( '.trizync-pop-cart-branding__preview-cta' );
+		var $eyebrowInput = $( 'input[name="trizync_pop_cart_header_eyebrow"]' );
+		var $titleInput = $( 'input[name="trizync_pop_cart_header_title"]' );
+		var $ctaInput = $( 'input[name="trizync_pop_cart_cta_label"]' );
 
 		function getBrandingState() {
 			var state = {};
@@ -331,6 +337,24 @@
 		$inputs.on( 'input change', function() {
 			applyBranding( getBrandingState() );
 		} );
+
+		function updatePreviewText() {
+			if ( $previewEyebrow.length && $eyebrowInput.length ) {
+				$previewEyebrow.text( $eyebrowInput.val() || $previewEyebrow.text() );
+			}
+			if ( $previewTitle.length && $titleInput.length ) {
+				$previewTitle.text( $titleInput.val() || $previewTitle.text() );
+			}
+			if ( $previewCta.length && $ctaInput.length ) {
+				$previewCta.text( $ctaInput.val() || $previewCta.text() );
+			}
+		}
+
+		updatePreviewText();
+
+		$eyebrowInput.on( 'input', updatePreviewText );
+		$titleInput.on( 'input', updatePreviewText );
+		$ctaInput.on( 'input', updatePreviewText );
 	} );
 
 })( jQuery );

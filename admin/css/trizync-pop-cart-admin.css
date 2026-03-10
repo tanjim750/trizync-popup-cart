@@ -303,7 +303,7 @@
 	border: none;
 	border-radius: 999px;
 	padding: 10px 12px;
-	color: #ffffff;
+	color: var(--trizync-tertiary);
 	background: var(--trizync-primary);
 	font-weight: 600;
 }

@@ -43,6 +43,13 @@
 		}
 	}
 
+	function triggerCheckoutEvent( name, args ) {
+		if ( typeof jQuery === 'undefined' ) {
+			return;
+		}
+		jQuery( document.body ).trigger( name, args || [] );
+	}
+
 	function openPopup() {
 		var popup = getPopup();
 		if ( ! popup ) {
@@ -51,6 +58,16 @@
 		applyPopupBranding();
 		popup.classList.add( 'is-open' );
 		popup.setAttribute( 'aria-hidden', 'false' );
+		triggerCheckoutEvent( 'init_checkout' );
+		triggerCheckoutEvent( 'woocommerce_before_checkout_form' );
+		triggerCheckoutEvent( 'woocommerce_checkout_before_customer_details' );
+		triggerCheckoutEvent( 'woocommerce_checkout_billing' );
+		triggerCheckoutEvent( 'woocommerce_checkout_shipping' );
+		triggerCheckoutEvent( 'woocommerce_checkout_after_customer_details' );
+		triggerCheckoutEvent( 'woocommerce_checkout_before_order_review' );
+		triggerCheckoutEvent( 'woocommerce_checkout_order_review' );
+		triggerCheckoutEvent( 'woocommerce_checkout_after_order_review' );
+		triggerCheckoutEvent( 'woocommerce_after_checkout_form' );
 	}
 
 	function closePopup() {
@@ -231,6 +248,7 @@
 
 			renderShipping( payload.shipping );
 			renderPayment( payload.payment );
+			triggerCheckoutEvent( 'updated_checkout', [ payload ] );
 			updateCtaState();
 		}
 
@@ -755,6 +773,7 @@
 				}
 				productValue.textContent = nextProduct;
 				currentProductQty = nextProduct;
+				triggerCheckoutEvent( 'update_checkout' );
 				fetchCart( false );
 				return;
 			}
@@ -780,6 +799,7 @@
 			}
 
 			valueEl.textContent = next;
+			triggerCheckoutEvent( 'update_checkout' );
 			updateCartItem( key, next );
 		} );
 
@@ -788,6 +808,7 @@
 			if ( ! key ) {
 				return;
 			}
+			triggerCheckoutEvent( 'update_checkout' );
 			removeCartItem( key );
 		} );
 
@@ -803,6 +824,7 @@
 				}
 			}
 			setShippingMethod( this.value );
+			triggerCheckoutEvent( 'update_checkout' );
 		} );
 
 		$( document ).on( 'change', 'input[name="trizync_pop_cart_payment"]', function() {
@@ -817,6 +839,7 @@
 				}
 			}
 			setPaymentMethod( this.value );
+			triggerCheckoutEvent( 'update_checkout' );
 		} );
 
 		$( document ).on( 'input change', '.woocommerce-checkout input, .woocommerce-checkout select, .woocommerce-checkout textarea', function() {

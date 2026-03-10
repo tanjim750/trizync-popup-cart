@@ -738,6 +738,8 @@ class Trizync_Pop_Cart_Public {
 
 		$this->ensure_cart_loaded();
 
+		$this->trigger_checkout_open_hooks();
+		$this->trigger_backend_checkout_hooks( 'get_cart' );
 		wp_send_json_success( $this->build_cart_payload() );
 	}
 
@@ -762,6 +764,7 @@ class Trizync_Pop_Cart_Public {
 			wp_send_json_error( array( 'message' => 'missing_product' ), 400 );
 		}
 
+		$this->trigger_backend_checkout_hooks( 'get_product_preview' );
 		wp_send_json_success( $this->build_product_preview_payload( $product_id, $quantity ) );
 	}
 
@@ -796,6 +799,7 @@ class Trizync_Pop_Cart_Public {
 			WC()->cart->set_quantity( $key, $quantity, true );
 		}
 
+		$this->trigger_backend_checkout_hooks( 'update_cart_item' );
 		wp_send_json_success( $this->build_cart_payload() );
 	}
 
@@ -825,6 +829,7 @@ class Trizync_Pop_Cart_Public {
 
 		WC()->cart->remove_cart_item( $key );
 
+		$this->trigger_backend_checkout_hooks( 'remove_cart_item' );
 		wp_send_json_success( $this->build_cart_payload() );
 	}
 
@@ -855,6 +860,7 @@ class Trizync_Pop_Cart_Public {
 		WC()->session->set( 'chosen_shipping_methods', array( $method ) );
 		WC()->cart->calculate_totals();
 
+		$this->trigger_backend_checkout_hooks( 'set_shipping_method' );
 		wp_send_json_success( $this->build_cart_payload() );
 	}
 
@@ -884,6 +890,7 @@ class Trizync_Pop_Cart_Public {
 
 		WC()->session->set( 'chosen_payment_method', $method );
 
+		$this->trigger_backend_checkout_hooks( 'set_payment_method' );
 		wp_send_json_success( $this->build_cart_payload() );
 	}
 
@@ -937,6 +944,51 @@ class Trizync_Pop_Cart_Public {
 			'hash'      => WC()->cart->get_cart_hash(),
 			'itemCount' => WC()->cart->get_cart_contents_count(),
 		);
+	}
+
+	/**
+	 * Trigger backend checkout/cart hooks for popup flow.
+	 *
+	 * @since 1.0.0
+	 * @param string $context
+	 */
+	private function trigger_backend_checkout_hooks( $context ) {
+		if ( ! function_exists( 'do_action' ) ) {
+			return;
+		}
+
+		do_action( 'trizync_pop_cart_backend_event', $context );
+
+		// Mirror WooCommerce update hooks used by plugins.
+		do_action( 'woocommerce_checkout_update_order_review', array( 'trizync_pop_cart' => true, 'context' => $context ) );
+		do_action( 'woocommerce_checkout_update_order_review_expired', array( 'trizync_pop_cart' => true, 'context' => $context ) );
+		do_action( 'woocommerce_cart_updated' );
+	}
+
+	/**
+	 * Trigger checkout open hooks for popup flow.
+	 *
+	 * @since 1.0.0
+	 */
+	private function trigger_checkout_open_hooks() {
+		if ( ! function_exists( 'WC' ) ) {
+			return;
+		}
+
+		$checkout = WC()->checkout();
+		if ( ! $checkout ) {
+			return;
+		}
+
+		do_action( 'woocommerce_before_checkout_form', $checkout );
+		do_action( 'woocommerce_checkout_before_customer_details' );
+		do_action( 'woocommerce_checkout_billing' );
+		do_action( 'woocommerce_checkout_shipping' );
+		do_action( 'woocommerce_checkout_after_customer_details' );
+		do_action( 'woocommerce_checkout_before_order_review' );
+		do_action( 'woocommerce_checkout_order_review' );
+		do_action( 'woocommerce_checkout_after_order_review' );
+		do_action( 'woocommerce_after_checkout_form', $checkout );
 	}
 
 	/**
