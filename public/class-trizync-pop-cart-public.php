@@ -317,9 +317,7 @@ class Trizync_Pop_Cart_Public {
 							</div>
 						</div>
 						<div class="trizync-pop-cart__right">
-							<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout>
-								<?php $this->render_checkout_form(); ?>
-							</div>
+							<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout></div>
 						</div>
 					</div>
 				</div>
@@ -456,6 +454,7 @@ class Trizync_Pop_Cart_Public {
 
 		add_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
 		add_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
+		add_filter( 'woocommerce_is_checkout', '__return_true' );
 		add_action( 'woocommerce_checkout_before_order_review', array( $this, 'render_popup_hidden_fields' ) );
 
 		$removed_order_review = false;
@@ -472,6 +471,7 @@ class Trizync_Pop_Cart_Public {
 
 		remove_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
 		remove_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
+		remove_filter( 'woocommerce_is_checkout', '__return_true' );
 		remove_action( 'woocommerce_checkout_before_order_review', array( $this, 'render_popup_hidden_fields' ) );
 
 		if ( $removed_order_review ) {
@@ -838,6 +838,54 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * AJAX: Get WooCommerce notices for popup.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_get_notices() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		ob_start();
+		if ( function_exists( 'wc_print_notices' ) ) {
+			wc_print_notices();
+		}
+		$notices = ob_get_clean();
+
+		wp_send_json_success(
+			array(
+				'notices' => $notices,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: Get checkout form HTML for popup.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_get_checkout_form() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		ob_start();
+		$this->render_checkout_form();
+		$form_html = ob_get_clean();
+
+		wp_send_json_success(
+			array(
+				'form' => $form_html,
+			)
+		);
+	}
+
+	/**
 	 * AJAX: Update cart item quantity.
 	 *
 	 * @since 1.0.0
@@ -1149,12 +1197,19 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
+		$posted_data = '';
+		if ( isset( $_POST['post_data'] ) ) {
+			$posted_data = wp_unslash( $_POST['post_data'] );
+		} elseif ( ! empty( $_POST ) ) {
+			$posted_data = http_build_query( wp_unslash( $_POST ) );
+		}
+
 		ob_start();
 		do_action( 'trizync_pop_cart_backend_event', $context );
 
 		// Mirror WooCommerce update hooks used by plugins.
-		do_action( 'woocommerce_checkout_update_order_review', array( 'trizync_pop_cart' => true, 'context' => $context ) );
-		do_action( 'woocommerce_checkout_update_order_review_expired', array( 'trizync_pop_cart' => true, 'context' => $context ) );
+		do_action( 'woocommerce_checkout_update_order_review', $posted_data );
+		do_action( 'woocommerce_checkout_update_order_review_expired' );
 		do_action( 'woocommerce_cart_updated' );
 		ob_end_clean();
 	}
