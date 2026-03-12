@@ -524,8 +524,19 @@
 	gap: 16px;
 }
 
+.trizync-pop-cart-scripts__controls {
+	display: flex;
+	align-items: flex-end;
+	gap: 16px;
+}
+
 .trizync-pop-cart-scripts__hook {
 	min-width: 240px;
+}
+
+.trizync-pop-cart-scripts__toggle {
+	display: flex;
+	align-items: center;
 }
 
 .trizync-pop-cart-scripts__body {

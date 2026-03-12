@@ -122,6 +122,7 @@ class Trizync_Pop_Cart_Public {
 				'cartHash' => function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart_hash() : '',
 				'currency' => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
 				'scripts'  => $this->get_scripts_settings(),
+				'scriptsEnabled' => (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 ),
 				'branding' => array_merge(
 					$this->get_branding_settings(),
 					array(

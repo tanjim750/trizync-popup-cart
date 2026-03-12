@@ -176,6 +176,16 @@ class Trizync_Pop_Cart_Admin {
 			)
 		);
 
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'absint',
+				'default'           => 1,
+			)
+		);
+
 		add_settings_section(
 			'trizync_pop_cart_main',
 			__( 'General', 'trizync-pop-cart' ),
@@ -433,6 +443,7 @@ class Trizync_Pop_Cart_Admin {
 		if ( ! is_array( $scripts ) ) {
 			$scripts = $this->get_default_scripts();
 		}
+		$enabled = (int) get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 );
 		$hooks = $this->get_script_hooks();
 		?>
 		<div class="trizync-pop-cart-scripts" data-script-manager data-hooks="<?php echo esc_attr( wp_json_encode( $hooks ) ); ?>">
@@ -442,9 +453,21 @@ class Trizync_Pop_Cart_Admin {
 					<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'Custom Scripts', 'trizync-pop-cart' ); ?></h2>
 					<p class="trizync-pop-cart-admin__card-subtitle"><?php esc_html_e( 'Run custom JavaScript at specific PopCart lifecycle steps.', 'trizync-pop-cart' ); ?></p>
 				</div>
-				<div class="trizync-pop-cart-scripts__hook">
-					<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-script-hook"><?php esc_html_e( 'Hook', 'trizync-pop-cart' ); ?></label>
-					<select id="trizync-pop-cart-script-hook" class="trizync-pop-cart-fields__select" data-scripts-hook></select>
+				<div class="trizync-pop-cart-scripts__controls">
+					<div class="trizync-pop-cart-scripts__hook">
+						<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-script-hook"><?php esc_html_e( 'Hook', 'trizync-pop-cart' ); ?></label>
+						<select id="trizync-pop-cart-script-hook" class="trizync-pop-cart-fields__select" data-scripts-hook></select>
+					</div>
+					<div class="trizync-pop-cart-scripts__toggle">
+						<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED ); ?>" value="0">
+						<label class="trizync-pop-cart-fields__toggle-inline">
+							<span class="trizync-pop-cart-fields__toggle-label"><?php esc_html_e( 'Enabled', 'trizync-pop-cart' ); ?></span>
+							<span class="trizync-pop-cart-fields__switch">
+								<input type="checkbox" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED ); ?>" value="1" <?php checked( 1, $enabled ); ?>>
+								<span class="trizync-pop-cart-fields__slider"></span>
+							</span>
+						</label>
+					</div>
 				</div>
 			</div>
 			<div class="trizync-pop-cart-scripts__body">

@@ -78,6 +78,9 @@
 		if ( ! window.TrizyncPopCart || ! TrizyncPopCart.scripts ) {
 			return;
 		}
+		if ( typeof TrizyncPopCart.scriptsEnabled !== 'undefined' && ! TrizyncPopCart.scriptsEnabled ) {
+			return;
+		}
 		var popup = getPopup();
 		if ( ! popup ) {
 			return;
@@ -247,8 +250,12 @@
 				checkoutWrap.innerHTML = response.data.form;
 				checkoutWrap.setAttribute( 'data-loaded', '1' );
 				checkoutWrap.setAttribute( 'data-loaded-ts', now.toString() );
+				popup.setAttribute( 'data-validation-ready', '1' );
 				if ( typeof updateCtaState === 'function' ) {
 					updateCtaState();
+				}
+				if ( typeof scheduleCtaRecheck === 'function' ) {
+					scheduleCtaRecheck();
 				}
 				syncHiddenSelections();
 				setTimeout( function() {
@@ -282,6 +289,7 @@
 			return;
 		}
 		showScriptError( '' );
+		popup.removeAttribute( 'data-validation-ready' );
 		emitPopcartHook( 'popcart:open:start', {} );
 		applyPopupBranding();
 		popup.classList.add( 'is-open' );
@@ -551,7 +559,15 @@
 			}
 
 			lastCartPayload = payload || null;
-			lastItemCount = payload && payload.itemCount ? payload.itemCount : 0;
+			if ( payload && typeof payload.itemCount !== 'undefined' && payload.itemCount !== null ) {
+				lastItemCount = parseInt( payload.itemCount, 10 ) || 0;
+			} else if ( payload && payload.items && payload.items.length ) {
+				lastItemCount = payload.items.reduce( function( total, item ) {
+					return total + ( item.quantity ? parseInt( item.quantity, 10 ) || 0 : 0 );
+				}, 0 );
+			} else {
+				lastItemCount = 0;
+			}
 			if ( ! payload || ! payload.items || payload.items.length === 0 ) {
 				if ( currentMode === 'cart' ) {
 					empty.hidden = false;
@@ -788,12 +804,17 @@
 			}
 			var form = popup.querySelector( 'form.woocommerce-checkout' );
 			if ( ! form ) {
-				cta.disabled = true;
+				cta.disabled = lastItemCount < 1;
 				return;
 			}
 
 			if ( lastItemCount < 1 ) {
 				cta.disabled = true;
+				return;
+			}
+
+			if ( ! popup.hasAttribute( 'data-validation-ready' ) ) {
+				cta.disabled = false;
 				return;
 			}
 
@@ -833,6 +854,15 @@
 			} else {
 				cta.disabled = true;
 			}
+		}
+
+		function scheduleCtaRecheck() {
+			var delays = [ 120, 350, 800 ];
+			delays.forEach( function( delay ) {
+				setTimeout( function() {
+					updateCtaState();
+				}, delay );
+			} );
 		}
 
 		function collectValidationErrors( form ) {

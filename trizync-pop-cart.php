@@ -43,6 +43,7 @@ define( 'TRIZYNC_POP_CART_OPTION_CTA_LABEL', 'trizync_pop_cart_cta_label' );
 define( 'TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW', 'trizync_pop_cart_header_eyebrow' );
 define( 'TRIZYNC_POP_CART_OPTION_HEADER_TITLE', 'trizync_pop_cart_header_title' );
 define( 'TRIZYNC_POP_CART_OPTION_SCRIPTS', 'trizync_pop_cart_scripts' );
+define( 'TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED', 'trizync_pop_cart_scripts_enabled' );
 
 /**
  * The code that runs during plugin activation.

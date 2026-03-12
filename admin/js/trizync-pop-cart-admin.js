@@ -381,7 +381,14 @@
 		var $code = $manager.find( '[data-scripts-code]' );
 		var $error = $manager.find( '[data-scripts-error]' );
 		var scripts = parseJson( $hidden.val() || '{}', {} );
+		var storedHook = '';
+		if ( window.localStorage ) {
+			storedHook = localStorage.getItem( 'trizync_pop_cart_script_hook' ) || '';
+		}
 		var currentHook = hooks.length ? hooks[0] : '';
+		if ( storedHook && hooks.indexOf( storedHook ) !== -1 ) {
+			currentHook = storedHook;
+		}
 
 		function syncScripts() {
 			$hidden.val( JSON.stringify( scripts ) );
@@ -404,6 +411,9 @@
 			currentHook = hook;
 			$select.val( hook );
 			$code.val( scripts[ hook ] || '' );
+			if ( window.localStorage ) {
+				localStorage.setItem( 'trizync_pop_cart_script_hook', hook );
+			}
 		}
 
 		$select.empty();

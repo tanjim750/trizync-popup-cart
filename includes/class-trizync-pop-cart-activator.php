@@ -36,6 +36,9 @@ class Trizync_Pop_Cart_Activator {
 		if ( false === get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS ) ) {
 			add_option( TRIZYNC_POP_CART_OPTION_SCRIPTS, wp_json_encode( array() ) );
 		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 );
+		}
 	}
 
 }
