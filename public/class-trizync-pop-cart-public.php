@@ -120,6 +120,7 @@ class Trizync_Pop_Cart_Public {
 				'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
 				'nonce'    => wp_create_nonce( 'trizync_pop_cart_nonce' ),
 				'cartHash' => function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart_hash() : '',
+				'currency' => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
 				'branding' => array_merge(
 					$this->get_branding_settings(),
 					array(
@@ -1098,9 +1099,11 @@ class Trizync_Pop_Cart_Public {
 			$product = $cart_item['data'];
 			$items[] = array(
 				'key'      => $cart_item_key,
+				'product_id' => $product->get_id(),
 				'name'     => $product->get_name(),
 				'quantity' => (int) $cart_item['quantity'],
 				'total'    => WC()->cart->get_product_subtotal( $product, (int) $cart_item['quantity'] ),
+				'line_total_raw' => isset( $cart_item['line_total'] ) ? (float) $cart_item['line_total'] : 0,
 			);
 		}
 
@@ -1113,7 +1116,9 @@ class Trizync_Pop_Cart_Public {
 			'shipping'  => $shipping_payload,
 			'payment'   => $payment_payload,
 			'subtotal'  => WC()->cart->get_cart_subtotal(),
+			'subtotal_raw' => (float) WC()->cart->get_subtotal(),
 			'total'     => WC()->cart->get_total(),
+			'total_raw' => (float) WC()->cart->get_total( 'edit' ),
 			'hash'      => WC()->cart->get_cart_hash(),
 			'itemCount' => WC()->cart->get_cart_contents_count(),
 		);
@@ -1293,15 +1298,19 @@ class Trizync_Pop_Cart_Public {
 			'items'     => array(
 				array(
 					'key'      => 'preview',
+					'product_id' => $product->get_id(),
 					'name'     => $product->get_name(),
 					'quantity' => $quantity,
 					'total'    => wc_price( $subtotal ),
+					'line_total_raw' => (float) $subtotal,
 				),
 			),
 			'shipping'  => $use_cart_rates ? $cart_shipping : array(),
 			'payment'   => $payment_payload,
 			'subtotal'  => wc_price( $subtotal ),
+			'subtotal_raw' => (float) $subtotal,
 			'total'     => wc_price( $subtotal + ( $use_cart_rates ? $shipping_total : 0 ) ),
+			'total_raw' => (float) ( $subtotal + ( $use_cart_rates ? $shipping_total : 0 ) ),
 			'hash'      => '',
 			'itemCount' => $quantity,
 		);
