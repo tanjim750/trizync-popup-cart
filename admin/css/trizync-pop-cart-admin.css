@@ -507,6 +507,59 @@
 	box-shadow: none;
 }
 
+.trizync-pop-cart-admin__card--scripts {
+	grid-column: 1 / -1;
+}
+
+.trizync-pop-cart-scripts {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.trizync-pop-cart-scripts__head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.trizync-pop-cart-scripts__hook {
+	min-width: 240px;
+}
+
+.trizync-pop-cart-scripts__body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.trizync-pop-cart-scripts__textarea {
+	min-height: 180px;
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.trizync-pop-cart-scripts__note {
+	margin: 0;
+	color: #667085;
+	font-size: 12px;
+}
+
+.trizync-pop-cart-scripts__error {
+	margin: 0;
+	color: #b42318;
+	background: #fef3f2;
+	border: 1px solid #fecdca;
+	padding: 8px 12px;
+	border-radius: 16px;
+}
+
+.trizync-pop-cart-scripts__actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 6px;
+}
+
 .trizync-pop-cart-admin__card-title {
 	margin: 0 0 6px;
 	font-size: 18px;

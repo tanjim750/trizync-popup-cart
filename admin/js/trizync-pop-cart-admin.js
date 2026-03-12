@@ -357,4 +357,104 @@
 		$ctaInput.on( 'input', updatePreviewText );
 	} );
 
+	$( function() {
+		var $manager = $( '[data-script-manager]' );
+		if ( ! $manager.length ) {
+			return;
+		}
+
+		function parseJson( value, fallback ) {
+			try {
+				var parsed = JSON.parse( value );
+				if ( parsed && typeof parsed === 'object' ) {
+					return parsed;
+				}
+			} catch ( e ) {
+				return fallback;
+			}
+			return fallback;
+		}
+
+		var hooks = parseJson( $manager.attr( 'data-hooks' ) || '[]', [] );
+		var $hidden = $manager.find( '[data-scripts-value]' );
+		var $select = $manager.find( '[data-scripts-hook]' );
+		var $code = $manager.find( '[data-scripts-code]' );
+		var $error = $manager.find( '[data-scripts-error]' );
+		var scripts = parseJson( $hidden.val() || '{}', {} );
+		var currentHook = hooks.length ? hooks[0] : '';
+
+		function syncScripts() {
+			$hidden.val( JSON.stringify( scripts ) );
+		}
+
+		function setError( message ) {
+			if ( ! $error.length ) {
+				return;
+			}
+			if ( message ) {
+				$error.text( message );
+				$error.prop( 'hidden', false );
+			} else {
+				$error.text( '' );
+				$error.prop( 'hidden', true );
+			}
+		}
+
+		function setCurrentHook( hook ) {
+			currentHook = hook;
+			$select.val( hook );
+			$code.val( scripts[ hook ] || '' );
+		}
+
+		$select.empty();
+		hooks.forEach( function( hook ) {
+			$select.append( '<option value="' + hook + '">' + hook + '</option>' );
+			if ( typeof scripts[ hook ] !== 'string' ) {
+				scripts[ hook ] = '';
+			}
+		} );
+
+		setCurrentHook( currentHook );
+		syncScripts();
+
+		$select.on( 'change', function() {
+			setCurrentHook( $( this ).val() );
+			setError( '' );
+		} );
+
+		$code.on( 'input', function() {
+			if ( ! currentHook ) {
+				return;
+			}
+			scripts[ currentHook ] = $( this ).val();
+			syncScripts();
+			setError( '' );
+		} );
+
+		$manager.closest( 'form' ).on( 'submit', function( event ) {
+			scripts[ currentHook ] = $code.val();
+			syncScripts();
+			setError( '' );
+			var errorFound = null;
+			hooks.some( function( hook ) {
+				var code = scripts[ hook ];
+				if ( code && code.trim().length ) {
+					try {
+						new Function( 'data', 'context', code );
+					} catch ( e ) {
+						errorFound = { hook: hook, error: e };
+						return true;
+					}
+				}
+				return false;
+			} );
+
+			if ( errorFound ) {
+				event.preventDefault();
+				setCurrentHook( errorFound.hook );
+				setError( 'Syntax error in ' + errorFound.hook + ': ' + errorFound.error.message );
+			}
+		} );
+	} );
+
 })( jQuery );

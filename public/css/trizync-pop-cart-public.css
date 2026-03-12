@@ -476,6 +476,16 @@
 	z-index: 2;
 }
 
+.trizync-pop-cart__script-error {
+	margin: 0 0 10px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(180, 35, 24, 0.08);
+	border: 1px solid rgba(180, 35, 24, 0.2);
+	color: #b42318;
+	font-size: 13px;
+}
+
 .trizync-pop-cart__cta {
 	width: 100%;
 	border: none;

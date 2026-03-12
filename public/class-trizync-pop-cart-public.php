@@ -121,6 +121,7 @@ class Trizync_Pop_Cart_Public {
 				'nonce'    => wp_create_nonce( 'trizync_pop_cart_nonce' ),
 				'cartHash' => function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart_hash() : '',
 				'currency' => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
+				'scripts'  => $this->get_scripts_settings(),
 				'branding' => array_merge(
 					$this->get_branding_settings(),
 					array(
@@ -323,6 +324,7 @@ class Trizync_Pop_Cart_Public {
 					</div>
 				</div>
 				<div class="trizync-pop-cart__footer">
+					<div class="trizync-pop-cart__script-error" data-trizync-pop-cart-script-error hidden></div>
 					<button type="button" class="trizync-pop-cart__cta" disabled="disabled"><?php echo esc_html( $this->get_cta_label() ); ?></button>
 				</div>
 			</div>
@@ -358,6 +360,64 @@ class Trizync_Pop_Cart_Public {
 		}
 
 		$raw = get_option( TRIZYNC_POP_CART_OPTION_BRANDING, wp_json_encode( $defaults ) );
+		$decoded = json_decode( $raw, true );
+		if ( ! is_array( $decoded ) ) {
+			return $defaults;
+		}
+
+		return array_merge( $defaults, $decoded );
+	}
+
+	/**
+	 * Get script hooks list.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_script_hooks() {
+		return array(
+			'popcart:boot',
+			'popcart:open:start',
+			'popcart:checkout:attempt',
+			'popcart:checkout:blocked',
+			'popcart:checkout:submit',
+			'popcart:checkout:error',
+			'popcart:checkout:success',
+			'popcart:close',
+			'popcart:cleanup',
+			'popcart:init_checkout',
+			'popcart:updated_checkout',
+			'popcart:update_checkout',
+			'popcart:checkout_error',
+			'popcart:woocommerce_before_checkout_form',
+			'popcart:woocommerce_checkout_before_customer_details',
+			'popcart:woocommerce_checkout_billing',
+			'popcart:woocommerce_checkout_shipping',
+			'popcart:woocommerce_checkout_after_customer_details',
+			'popcart:woocommerce_checkout_before_order_review',
+			'popcart:woocommerce_checkout_order_review',
+			'popcart:woocommerce_checkout_after_order_review',
+			'popcart:woocommerce_after_checkout_form',
+		);
+	}
+
+	/**
+	 * Get scripts mapping merged with defaults.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_scripts_settings() {
+		$defaults = array();
+		foreach ( $this->get_script_hooks() as $hook ) {
+			$defaults[ $hook ] = '';
+		}
+
+		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_SCRIPTS' ) ) {
+			return $defaults;
+		}
+
+		$raw = get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS, wp_json_encode( $defaults ) );
 		$decoded = json_decode( $raw, true );
 		if ( ! is_array( $decoded ) ) {
 			return $defaults;
@@ -1097,12 +1157,36 @@ class Trizync_Pop_Cart_Public {
 			}
 
 			$product = $cart_item['data'];
+			$categories = function_exists( 'wc_get_product_terms' ) ? wc_get_product_terms( $product->get_id(), 'product_cat', array( 'fields' => 'names' ) ) : array();
+			if ( ! is_array( $categories ) ) {
+				$categories = array();
+			}
+			$variants = array();
+			if ( $product instanceof WC_Product_Variation ) {
+				foreach ( $product->get_variation_attributes() as $attribute => $value ) {
+					$label = wc_attribute_label( str_replace( 'attribute_', '', $attribute ) );
+					$variants[] = array(
+						'id'    => $attribute,
+						'name'  => $label ? $label : $attribute,
+						'value' => $value,
+					);
+				}
+			}
+
 			$items[] = array(
-				'key'      => $cart_item_key,
-				'product_id' => $product->get_id(),
-				'name'     => $product->get_name(),
-				'quantity' => (int) $cart_item['quantity'],
-				'total'    => WC()->cart->get_product_subtotal( $product, (int) $cart_item['quantity'] ),
+				'key'            => $cart_item_key,
+				'product_id'     => $product->get_id(),
+				'sku'            => $product->get_sku(),
+				'name'           => $product->get_name(),
+				'quantity'       => (int) $cart_item['quantity'],
+				'price_raw'      => (float) $product->get_price(),
+				'regular_price_raw' => (float) $product->get_regular_price(),
+				'sale_price_raw' => (float) $product->get_sale_price(),
+				'image'          => $product->get_image_id() ? wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) : '',
+				'permalink'      => get_permalink( $product->get_id() ),
+				'categories'     => $categories,
+				'variants'       => $variants,
+				'total'          => WC()->cart->get_product_subtotal( $product, (int) $cart_item['quantity'] ),
 				'line_total_raw' => isset( $cart_item['line_total'] ) ? (float) $cart_item['line_total'] : 0,
 			);
 		}

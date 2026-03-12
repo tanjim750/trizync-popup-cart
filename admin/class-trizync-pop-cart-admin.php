@@ -166,6 +166,16 @@ class Trizync_Pop_Cart_Admin {
 			)
 		);
 
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_SCRIPTS,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_scripts' ),
+				'default'           => wp_json_encode( $this->get_default_scripts() ),
+			)
+		);
+
 		add_settings_section(
 			'trizync_pop_cart_main',
 			__( 'General', 'trizync-pop-cart' ),
@@ -209,6 +219,21 @@ class Trizync_Pop_Cart_Admin {
 			array( $this, 'render_branding_manager' ),
 			'trizync-pop-cart',
 			'trizync_pop_cart_branding'
+		);
+
+		add_settings_section(
+			'trizync_pop_cart_scripts',
+			__( 'Custom Scripts', 'trizync-pop-cart' ),
+			'__return_false',
+			'trizync-pop-cart'
+		);
+
+		add_settings_field(
+			'trizync_pop_cart_scripts_manager',
+			'',
+			array( $this, 'render_scripts_manager' ),
+			'trizync-pop-cart',
+			'trizync_pop_cart_scripts'
 		);
 	}
 
@@ -291,6 +316,11 @@ class Trizync_Pop_Cart_Admin {
 					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--fields">
 						<?php
 						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_fields' );
+						?>
+					</div>
+					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--scripts">
+						<?php
+						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_scripts' );
 						?>
 					</div>
 				</div>
@@ -393,6 +423,44 @@ class Trizync_Pop_Cart_Admin {
 	}
 
 	/**
+	 * Render custom scripts manager UI.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_scripts_manager() {
+		$raw = get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS, wp_json_encode( $this->get_default_scripts() ) );
+		$scripts = json_decode( $raw, true );
+		if ( ! is_array( $scripts ) ) {
+			$scripts = $this->get_default_scripts();
+		}
+		$hooks = $this->get_script_hooks();
+		?>
+		<div class="trizync-pop-cart-scripts" data-script-manager data-hooks="<?php echo esc_attr( wp_json_encode( $hooks ) ); ?>">
+			<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_SCRIPTS ); ?>" value="<?php echo esc_attr( wp_json_encode( $scripts ) ); ?>" data-scripts-value>
+			<div class="trizync-pop-cart-scripts__head">
+				<div>
+					<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'Custom Scripts', 'trizync-pop-cart' ); ?></h2>
+					<p class="trizync-pop-cart-admin__card-subtitle"><?php esc_html_e( 'Run custom JavaScript at specific PopCart lifecycle steps.', 'trizync-pop-cart' ); ?></p>
+				</div>
+				<div class="trizync-pop-cart-scripts__hook">
+					<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-script-hook"><?php esc_html_e( 'Hook', 'trizync-pop-cart' ); ?></label>
+					<select id="trizync-pop-cart-script-hook" class="trizync-pop-cart-fields__select" data-scripts-hook></select>
+				</div>
+			</div>
+			<div class="trizync-pop-cart-scripts__body">
+				<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-script-code"><?php esc_html_e( 'Script', 'trizync-pop-cart' ); ?></label>
+				<textarea id="trizync-pop-cart-script-code" class="trizync-pop-cart-fields__textarea trizync-pop-cart-scripts__textarea" rows="8" placeholder="<?php echo esc_attr__( 'Use `data` and `context` for payload. Example: if (data.action === \"popcart:checkout:submit\") { console.log(data.cart); }', 'trizync-pop-cart' ); ?>" data-scripts-code></textarea>
+				<p class="trizync-pop-cart-scripts__note"><?php esc_html_e( 'Scripts run only inside the popup. Syntax errors will block saving.', 'trizync-pop-cart' ); ?></p>
+				<p class="trizync-pop-cart-scripts__error" data-scripts-error hidden></p>
+				<div class="trizync-pop-cart-scripts__actions">
+					<?php submit_button( __( 'Save Scripts', 'trizync-pop-cart' ), 'primary trizync-pop-cart-admin__pill', 'submit', false ); ?>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Sanitize fields JSON.
 	 *
 	 * @since 1.0.0
@@ -473,6 +541,36 @@ class Trizync_Pop_Cart_Admin {
 			if ( empty( $value ) ) {
 				$defaults = $this->get_default_branding();
 				$clean[ $key ] = $defaults[ $key ];
+			}
+		}
+
+		return wp_json_encode( $clean );
+	}
+
+	/**
+	 * Sanitize custom scripts JSON.
+	 *
+	 * @since 1.0.0
+	 * @param string $value
+	 * @return string
+	 */
+	public function sanitize_scripts( $value ) {
+		if ( empty( $value ) ) {
+			return wp_json_encode( $this->get_default_scripts() );
+		}
+
+		$decoded = json_decode( $value, true );
+		if ( ! is_array( $decoded ) ) {
+			return wp_json_encode( $this->get_default_scripts() );
+		}
+
+		$hooks = $this->get_script_hooks();
+		$clean = array();
+		foreach ( $hooks as $hook ) {
+			if ( isset( $decoded[ $hook ] ) && is_string( $decoded[ $hook ] ) ) {
+				$clean[ $hook ] = wp_unslash( $decoded[ $hook ] );
+			} else {
+				$clean[ $hook ] = '';
 			}
 		}
 
@@ -589,6 +687,54 @@ class Trizync_Pop_Cart_Admin {
 			'primary'   => '#411264',
 			'secondary' => '#f0a60a',
 			'tertiary'  => '#ffffff',
+		);
+	}
+
+	/**
+	 * Default scripts mapping.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_default_scripts() {
+		$hooks = $this->get_script_hooks();
+		$defaults = array();
+		foreach ( $hooks as $hook ) {
+			$defaults[ $hook ] = '';
+		}
+		return $defaults;
+	}
+
+	/**
+	 * Script hook list.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_script_hooks() {
+		return array(
+			'popcart:boot',
+			'popcart:open:start',
+			'popcart:checkout:attempt',
+			'popcart:checkout:blocked',
+			'popcart:checkout:submit',
+			'popcart:checkout:error',
+			'popcart:checkout:success',
+			'popcart:close',
+			'popcart:cleanup',
+			'popcart:init_checkout',
+			'popcart:updated_checkout',
+			'popcart:update_checkout',
+			'popcart:checkout_error',
+			'popcart:woocommerce_before_checkout_form',
+			'popcart:woocommerce_checkout_before_customer_details',
+			'popcart:woocommerce_checkout_billing',
+			'popcart:woocommerce_checkout_shipping',
+			'popcart:woocommerce_checkout_after_customer_details',
+			'popcart:woocommerce_checkout_before_order_review',
+			'popcart:woocommerce_checkout_order_review',
+			'popcart:woocommerce_checkout_after_order_review',
+			'popcart:woocommerce_after_checkout_form',
 		);
 	}
 

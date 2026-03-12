@@ -43,6 +43,77 @@
 		}
 	}
 
+	var popcartSessionId = 'pc_' + Math.random().toString( 36 ).slice( 2 ) + Date.now().toString( 36 );
+	var initiateCheckoutPending = false;
+
+	function getHookContext( action ) {
+		return {
+			hook: action,
+			popup_type: window.TrizyncPopCartCurrentMode || 'cart',
+			page_url: window.location.href,
+			timestamp: new Date().toISOString(),
+			session_id: popcartSessionId
+		};
+	}
+
+	function showScriptError( message ) {
+		var popup = getPopup();
+		if ( ! popup ) {
+			return;
+		}
+		var errorWrap = popup.querySelector( '[data-trizync-pop-cart-script-error]' );
+		if ( ! errorWrap ) {
+			return;
+		}
+		if ( message ) {
+			errorWrap.textContent = message;
+			errorWrap.hidden = false;
+		} else {
+			errorWrap.textContent = '';
+			errorWrap.hidden = true;
+		}
+	}
+
+	function runHookScripts( action, data, context ) {
+		if ( ! window.TrizyncPopCart || ! TrizyncPopCart.scripts ) {
+			return;
+		}
+		var popup = getPopup();
+		if ( ! popup ) {
+			return;
+		}
+		var script = TrizyncPopCart.scripts[ action ];
+		if ( ! script || ! script.trim ) {
+			return;
+		}
+		var code = script.trim();
+		if ( ! code ) {
+			return;
+		}
+		try {
+			showScriptError( '' );
+			new Function( 'data', 'context', code )( data, context );
+		} catch ( e ) {
+			showScriptError( 'Script error in ' + action + ': ' + e.message );
+		}
+	}
+
+	function emitPopcartHook( action, payload ) {
+		var context = getHookContext( action );
+		var data = payload && typeof payload === 'object' ? payload : {};
+		data.action = action;
+		data.timestamp = context.timestamp;
+		data.popup_type = context.popup_type;
+		data.page_url = context.page_url;
+		if ( ! data.meta ) {
+			data.meta = {};
+		}
+		if ( ! data.meta.session_id ) {
+			data.meta.session_id = context.session_id;
+		}
+		runHookScripts( action, data, context );
+	}
+
 	function triggerCheckoutEvent( name, args ) {
 		if ( typeof jQuery === 'undefined' ) {
 			return;
@@ -210,6 +281,8 @@
 		if ( ! popup ) {
 			return;
 		}
+		showScriptError( '' );
+		emitPopcartHook( 'popcart:open:start', {} );
 		applyPopupBranding();
 		popup.classList.add( 'is-open' );
 		popup.setAttribute( 'aria-hidden', 'false' );
@@ -223,15 +296,25 @@
 				sessionStorage.setItem( storageKey, now.toString() );
 			}
 			triggerCheckoutEvent( 'init_checkout' );
+			emitPopcartHook( 'popcart:init_checkout', {} );
 			triggerCheckoutEvent( 'woocommerce_before_checkout_form' );
+			emitPopcartHook( 'popcart:woocommerce_before_checkout_form', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_before_customer_details' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_before_customer_details', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_billing' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_billing', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_shipping' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_shipping', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_after_customer_details' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_after_customer_details', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_before_order_review' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_before_order_review', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_order_review' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_order_review', {} );
 			triggerCheckoutEvent( 'woocommerce_checkout_after_order_review' );
+			emitPopcartHook( 'popcart:woocommerce_checkout_after_order_review', {} );
 			triggerCheckoutEvent( 'woocommerce_after_checkout_form' );
+			emitPopcartHook( 'popcart:woocommerce_after_checkout_form', {} );
 			initiateCheckoutPending = true;
 		}
 		loadCheckoutForm();
@@ -322,6 +405,7 @@
 
 	$( function() {
 		applyPopupBranding();
+		emitPopcartHook( 'popcart:boot', {} );
 
 		var isFetchingCart = false;
 		var currentMode = 'cart';
@@ -333,7 +417,91 @@
 		var preparedProductId = 0;
 		var preparedProductQty = 0;
 		var lastCartPayload = null;
-		var initiateCheckoutPending = false;
+
+		function buildCartSummary( payload ) {
+			if ( ! payload ) {
+				return {
+					items_count: 0,
+					qty_total: 0,
+					subtotal: '',
+					subtotal_raw: 0,
+					total: '',
+					total_raw: 0,
+					currency: ( window.TrizyncPopCart && TrizyncPopCart.currency ) ? TrizyncPopCart.currency : ''
+				};
+			}
+			var qtyTotal = 0;
+			if ( payload.items && payload.items.length ) {
+				payload.items.forEach( function( item ) {
+					qtyTotal += item.quantity ? parseInt( item.quantity, 10 ) || 0 : 0;
+				} );
+			}
+			return {
+				items_count: payload.itemCount || 0,
+				qty_total: qtyTotal,
+				subtotal: payload.subtotal || '',
+				subtotal_raw: typeof payload.subtotal_raw !== 'undefined' ? payload.subtotal_raw : 0,
+				total: payload.total || '',
+				total_raw: typeof payload.total_raw !== 'undefined' ? payload.total_raw : 0,
+				currency: ( window.TrizyncPopCart && TrizyncPopCart.currency ) ? TrizyncPopCart.currency : ''
+			};
+		}
+
+		function mapItemToProduct( item ) {
+			if ( ! item ) {
+				return null;
+			}
+			return {
+				id: item.product_id || item.id || '',
+				sku: item.sku || '',
+				name: item.name || '',
+				price: typeof item.price_raw !== 'undefined' ? item.price_raw : null,
+				regular_price: typeof item.regular_price_raw !== 'undefined' ? item.regular_price_raw : null,
+				sale_price: typeof item.sale_price_raw !== 'undefined' ? item.sale_price_raw : null,
+				qty: item.quantity || 1,
+				currency: ( window.TrizyncPopCart && TrizyncPopCart.currency ) ? TrizyncPopCart.currency : '',
+				image: item.image || '',
+				permalink: item.permalink || '',
+				categories: item.categories || [],
+				variants: item.variants || []
+			};
+		}
+
+		function buildHookPayload( action, extra ) {
+			var payload = lastCartPayload || null;
+			var cartItems = [];
+			if ( payload && payload.items && payload.items.length ) {
+				cartItems = payload.items.map( function( item ) {
+					return mapItemToProduct( item );
+				} ).filter( function( item ) { return item; } );
+			}
+			var data = {
+				action: action,
+				cart: buildCartSummary( payload ),
+				cart_items: cartItems,
+				product: currentMode === 'product' && cartItems.length ? cartItems[0] : null,
+				errors: []
+			};
+			if ( extra && typeof extra === 'object' ) {
+				Object.keys( extra ).forEach( function( key ) {
+					data[ key ] = extra[ key ];
+				} );
+			}
+			return data;
+		}
+
+		function getSelectionData() {
+			var popup = getPopup();
+			if ( ! popup ) {
+				return {};
+			}
+			var shipping = popup.querySelector( 'input[name="trizync_pop_cart_shipping"]:checked' );
+			var payment = popup.querySelector( 'input[name="trizync_pop_cart_payment"]:checked' );
+			return {
+				shipping_method: shipping ? shipping.value : '',
+				payment_method: payment ? payment.value : ''
+			};
+		}
 
 		function renderCart( payload ) {
 			var popup = getPopup();
@@ -506,6 +674,7 @@
 			renderShipping( payload.shipping );
 			renderPayment( payload.payment );
 			triggerCheckoutEvent( 'updated_checkout', [ payload ] );
+			emitPopcartHook( 'popcart:updated_checkout', buildHookPayload( 'popcart:updated_checkout' ) );
 			if ( initiateCheckoutPending ) {
 				fireInitiateCheckout( payload );
 				initiateCheckoutPending = false;
@@ -664,6 +833,43 @@
 			} else {
 				cta.disabled = true;
 			}
+		}
+
+		function collectValidationErrors( form ) {
+			var errors = [];
+			if ( ! form ) {
+				return errors;
+			}
+			var requiredNames = [ 'billing_first_name', 'billing_phone', 'billing_email', 'billing_address_1' ];
+			requiredNames.forEach( function( name ) {
+				var field = form.querySelector( '[name="' + name + '"]' );
+				if ( ! field || field.disabled || field.closest( '.woocommerce-input-wrapper' )?.classList.contains( 'hidden' ) ) {
+					return;
+				}
+				if ( ! isFieldFilled( field ) ) {
+					errors.push( { field: name, message: 'Required field missing' } );
+				}
+			} );
+
+			var emailField = form.querySelector( '[name="billing_email"]' );
+			if ( emailField && isFieldFilled( emailField ) ) {
+				var emailValue = emailField.value.trim();
+				if ( ! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test( emailValue ) ) {
+					errors.push( { field: 'billing_email', message: 'Invalid email address' } );
+				}
+			}
+
+			var phoneField = form.querySelector( '[name="billing_phone"]' );
+			if ( phoneField && isFieldFilled( phoneField ) ) {
+				var phoneValue = phoneField.value.trim();
+				var digitsOnly = phoneValue.replace( /[^\d]/g, '' );
+				var phoneValid = /^\+?[\d\s\-().]+$/.test( phoneValue ) && digitsOnly.length >= 7 && digitsOnly.length <= 15;
+				if ( ! phoneValid ) {
+					errors.push( { field: 'billing_phone', message: 'Invalid phone number' } );
+				}
+			}
+
+			return errors;
 		}
 
 		function fetchNotices() {
@@ -1092,11 +1298,13 @@
 			if ( ! form ) {
 				return;
 			}
+			event.preventDefault();
+			emitPopcartHook( 'popcart:checkout:attempt', buildHookPayload( 'popcart:checkout:attempt' ) );
 			if ( this.disabled ) {
-				event.preventDefault();
+				var errors = collectValidationErrors( form );
+				emitPopcartHook( 'popcart:checkout:blocked', buildHookPayload( 'popcart:checkout:blocked', { errors: errors } ) );
 				return;
 			}
-			event.preventDefault();
 			var placeOrder = popup.querySelector( '[data-trizync-pop-cart-place-order]' );
 			if ( placeOrder ) {
 				placeOrder.value = '1';
@@ -1151,6 +1359,7 @@
 				productValue.textContent = nextProduct;
 				currentProductQty = nextProduct;
 				triggerCheckoutEvent( 'update_checkout' );
+				emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout' ) );
 				fetchCart( false );
 				return;
 			}
@@ -1177,6 +1386,7 @@
 
 			valueEl.textContent = next;
 			triggerCheckoutEvent( 'update_checkout' );
+			emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout' ) );
 			updateCartItem( key, next );
 		} );
 
@@ -1186,6 +1396,7 @@
 				return;
 			}
 			triggerCheckoutEvent( 'update_checkout' );
+			emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout' ) );
 			removeCartItem( key );
 		} );
 
@@ -1202,6 +1413,7 @@
 			}
 			setShippingMethod( this.value );
 			triggerCheckoutEvent( 'update_checkout' );
+			emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout', { selection: getSelectionData() } ) );
 		} );
 
 		$( document ).on( 'change', 'input[name="trizync_pop_cart_payment"]', function() {
@@ -1217,6 +1429,7 @@
 			}
 			setPaymentMethod( this.value );
 			triggerCheckoutEvent( 'update_checkout' );
+			emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout', { selection: getSelectionData() } ) );
 		} );
 
 		$( document ).on( 'input change', '.woocommerce-checkout input, .woocommerce-checkout select, .woocommerce-checkout textarea', function() {
@@ -1226,6 +1439,7 @@
 		$( document ).on( 'click', '[data-trizync-pop-cart-close]', function( event ) {
 			event.preventDefault();
 			closePopup();
+			emitPopcartHook( 'popcart:close', buildHookPayload( 'popcart:close' ) );
 			if ( currentMode === 'product' && productCheckoutPrepared ) {
 				$.post(
 					TrizyncPopCart.ajaxUrl,
@@ -1235,7 +1449,10 @@
 					}
 				).always( function() {
 					productCheckoutPrepared = false;
+					emitPopcartHook( 'popcart:cleanup', buildHookPayload( 'popcart:cleanup', { cart_restored: true } ) );
 				} );
+			} else {
+				emitPopcartHook( 'popcart:cleanup', buildHookPayload( 'popcart:cleanup', { cart_restored: false } ) );
 			}
 		} );
 
@@ -1245,6 +1462,7 @@
 			if ( ctaButton ) {
 				setCtaLoading( ctaButton, true );
 			}
+			emitPopcartHook( 'popcart:checkout:submit', buildHookPayload( 'popcart:checkout:submit', { selection: getSelectionData() } ) );
 			var actionUrl = '';
 			if ( window.wc_checkout_params && wc_checkout_params.checkout_url ) {
 				actionUrl = wc_checkout_params.checkout_url;
@@ -1277,6 +1495,7 @@
 				dataType: 'json',
 				success: function( response ) {
 					if ( response && response.result === 'success' && response.redirect ) {
+						emitPopcartHook( 'popcart:checkout:success', buildHookPayload( 'popcart:checkout:success', { order_id: response.order_id || null, redirect: response.redirect } ) );
 						window.location = response.redirect;
 						return;
 					}
@@ -1287,6 +1506,8 @@
 						setCtaLoading( ctaButton, false );
 					}
 					triggerCheckoutEvent( 'checkout_error' );
+					emitPopcartHook( 'popcart:checkout_error', buildHookPayload( 'popcart:checkout_error', { errors: [ { message: response && response.messages ? response.messages : 'Checkout failed' } ] } ) );
+					emitPopcartHook( 'popcart:checkout:error', buildHookPayload( 'popcart:checkout:error', { errors: [ { message: response && response.messages ? response.messages : 'Checkout failed' } ] } ) );
 				},
 				error: function( xhr ) {
 					if ( noticesWrap && xhr && xhr.responseText ) {
@@ -1296,6 +1517,8 @@
 						setCtaLoading( ctaButton, false );
 					}
 					triggerCheckoutEvent( 'checkout_error' );
+					emitPopcartHook( 'popcart:checkout_error', buildHookPayload( 'popcart:checkout_error', { errors: [ { message: xhr && xhr.responseText ? xhr.responseText : 'Checkout failed' } ] } ) );
+					emitPopcartHook( 'popcart:checkout:error', buildHookPayload( 'popcart:checkout:error', { errors: [ { message: xhr && xhr.responseText ? xhr.responseText : 'Checkout failed' } ] } ) );
 				}
 			} );
 		}
