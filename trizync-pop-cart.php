@@ -44,6 +44,10 @@ define( 'TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW', 'trizync_pop_cart_header_eyebr
 define( 'TRIZYNC_POP_CART_OPTION_HEADER_TITLE', 'trizync_pop_cart_header_title' );
 define( 'TRIZYNC_POP_CART_OPTION_SCRIPTS', 'trizync_pop_cart_scripts' );
 define( 'TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED', 'trizync_pop_cart_scripts_enabled' );
+define( 'TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON', 'trizync_pop_cart_product_button' );
+define( 'TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL', 'trizync_pop_cart_product_button_label' );
+define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC', 'trizync_pop_cart_replace_atc' );
+define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL', 'trizync_pop_cart_replace_atc_label' );
 
 /**
  * The code that runs during plugin activation.

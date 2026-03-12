@@ -168,6 +168,46 @@ class Trizync_Pop_Cart_Admin {
 
 		register_setting(
 			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'absint',
+				'default'           => 0,
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_REPLACE_ATC,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'absint',
+				'default'           => 0,
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => __( 'Checkout', 'trizync-pop-cart' ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => __( 'Checkout', 'trizync-pop-cart' ),
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
 			TRIZYNC_POP_CART_OPTION_SCRIPTS,
 			array(
 				'type'              => 'string',
@@ -311,6 +351,34 @@ class Trizync_Pop_Cart_Admin {
 				<div class="trizync-pop-cart-admin__grid">
 					<div class="trizync-pop-cart-admin__card">
 						<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'General', 'trizync-pop-cart' ); ?></h2>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__toggle-inline">
+								<span class="trizync-pop-cart-fields__toggle-label"><?php esc_html_e( 'Replace Add to Cart buttons', 'trizync-pop-cart' ); ?></span>
+								<span class="trizync-pop-cart-fields__switch">
+									<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_REPLACE_ATC ); ?>" value="0">
+									<input type="checkbox" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_REPLACE_ATC ); ?>" value="1" <?php checked( 1, (int) get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC, 0 ) ); ?>>
+									<span class="trizync-pop-cart-fields__slider"></span>
+								</span>
+							</label>
+						</div>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Add to Cart label', 'trizync-pop-cart' ); ?></label>
+							<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL ); ?>" value="<?php echo esc_attr( get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL, __( 'Checkout', 'trizync-pop-cart' ) ) ); ?>">
+						</div>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__toggle-inline">
+								<span class="trizync-pop-cart-fields__toggle-label"><?php esc_html_e( 'Show product popup button', 'trizync-pop-cart' ); ?></span>
+								<span class="trizync-pop-cart-fields__switch">
+									<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON ); ?>" value="0">
+									<input type="checkbox" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON ); ?>" value="1" <?php checked( 1, (int) get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON, 0 ) ); ?>>
+									<span class="trizync-pop-cart-fields__slider"></span>
+								</span>
+							</label>
+						</div>
+						<div class="trizync-pop-cart-branding__cta">
+							<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Product button label', 'trizync-pop-cart' ); ?></label>
+							<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL ); ?>" value="<?php echo esc_attr( get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL, __( 'Checkout', 'trizync-pop-cart' ) ) ); ?>">
+						</div>
 						<div class="trizync-pop-cart-branding__cta">
 							<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Header eyebrow', 'trizync-pop-cart' ); ?></label>
 							<input type="text" class="trizync-pop-cart-fields__input" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW ); ?>" value="<?php echo esc_attr( get_option( TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW, __( 'Instant checkout', 'trizync-pop-cart' ) ) ); ?>">

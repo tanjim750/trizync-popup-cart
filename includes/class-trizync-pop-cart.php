@@ -204,6 +204,8 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_checkout_form', $plugin_public, 'ajax_get_checkout_form' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_checkout_form', $plugin_public, 'ajax_get_checkout_form' );
 		$this->loader->add_filter( 'woocommerce_loop_add_to_cart_link', $plugin_public, 'decorate_loop_add_to_cart_link', 10, 2 );
+		$this->loader->add_filter( 'woocommerce_product_add_to_cart_text', $plugin_public, 'filter_loop_add_to_cart_text' );
+		$this->loader->add_filter( 'woocommerce_product_single_add_to_cart_text', $plugin_public, 'filter_single_add_to_cart_text' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 

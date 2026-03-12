@@ -39,6 +39,18 @@ class Trizync_Pop_Cart_Activator {
 		if ( false === get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED ) ) {
 			add_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 );
 		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON, 0 );
+		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL, 'Checkout' );
+		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC, 0 );
+		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL, 'Checkout' );
+		}
 	}
 
 }
