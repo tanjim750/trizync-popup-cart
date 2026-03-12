@@ -323,6 +323,15 @@ class Trizync_Pop_Cart_Public {
 									<div class="trizync-pop-cart__variation-list" data-trizync-pop-cart-variation-list></div>
 									<p class="trizync-pop-cart__variation-error" data-trizync-pop-cart-variation-error hidden><?php esc_html_e( 'Please select product options.', 'trizync-pop-cart' ); ?></p>
 								</div>
+								<div class="trizync-pop-cart__coupon" data-trizync-pop-cart-coupon>
+									<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Coupon', 'trizync-pop-cart' ); ?></p>
+									<div class="trizync-pop-cart__coupon-form">
+										<input type="text" class="trizync-pop-cart__coupon-input" placeholder="<?php esc_attr_e( 'Enter coupon code', 'trizync-pop-cart' ); ?>" data-trizync-pop-cart-coupon-input>
+										<button type="button" class="trizync-pop-cart__coupon-apply" data-trizync-pop-cart-coupon-apply><?php esc_html_e( 'Apply', 'trizync-pop-cart' ); ?></button>
+									</div>
+									<p class="trizync-pop-cart__coupon-error" data-trizync-pop-cart-coupon-error hidden></p>
+									<div class="trizync-pop-cart__coupon-list" data-trizync-pop-cart-coupon-list></div>
+								</div>
 								<div class="trizync-pop-cart__shipping" data-trizync-pop-cart-shipping hidden>
 									<p class="trizync-pop-cart__section-label"><?php esc_html_e( 'Shipping method', 'trizync-pop-cart' ); ?></p>
 									<div class="trizync-pop-cart__shipping-empty" data-trizync-pop-cart-shipping-empty hidden>
@@ -354,6 +363,7 @@ class Trizync_Pop_Cart_Public {
 							</div>
 						</div>
 						<div class="trizync-pop-cart__right">
+							<div class="woocommerce-notices-wrapper"></div>
 							<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout></div>
 						</div>
 					</div>
@@ -1019,6 +1029,20 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * Build notices HTML.
+	 *
+	 * @since 1.0.0
+	 * @return string
+	 */
+	private function build_notices() {
+		ob_start();
+		if ( function_exists( 'wc_print_notices' ) ) {
+			wc_print_notices();
+		}
+		return ob_get_clean();
+	}
+
+	/**
 	 * AJAX: Get checkout form HTML for popup.
 	 *
 	 * @since 1.0.0
@@ -1039,6 +1063,120 @@ class Trizync_Pop_Cart_Public {
 				'form' => $form_html,
 			)
 		);
+	}
+
+	/**
+	 * AJAX: Apply coupon code.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_apply_coupon() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		$this->ensure_cart_loaded();
+
+		$code = isset( $_POST['code'] ) ? wc_clean( wp_unslash( $_POST['code'] ) ) : '';
+		if ( ! $code ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a coupon code.', 'trizync-pop-cart' ) ), 400 );
+		}
+
+		if ( ! WC()->cart ) {
+			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
+		}
+
+		$applied = WC()->cart->apply_coupon( $code );
+		WC()->cart->calculate_totals();
+
+		if ( ! $applied ) {
+			$message = __( 'Coupon could not be applied.', 'trizync-pop-cart' );
+			if ( function_exists( 'wc_get_notices' ) ) {
+				$notices = wc_get_notices( 'error' );
+				if ( ! empty( $notices ) && isset( $notices[0]['notice'] ) ) {
+					$message = wp_strip_all_tags( $notices[0]['notice'] );
+				}
+			}
+			wp_send_json_error( array( 'message' => $message ), 400 );
+		}
+
+		wp_send_json_success( $this->build_cart_payload() );
+	}
+
+	/**
+	 * AJAX: Remove coupon code.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_remove_coupon() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		$this->ensure_cart_loaded();
+
+		$code = isset( $_POST['code'] ) ? wc_clean( wp_unslash( $_POST['code'] ) ) : '';
+		if ( ! $code || ! WC()->cart ) {
+			wp_send_json_error( array( 'message' => 'missing_coupon' ), 400 );
+		}
+
+		WC()->cart->remove_coupon( $code );
+		WC()->cart->calculate_totals();
+
+		wp_send_json_success( $this->build_cart_payload() );
+	}
+
+	/**
+	 * AJAX: Update customer address data.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_update_customer() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
+
+		$this->ensure_cart_loaded();
+
+		if ( ! function_exists( 'WC' ) || ! WC()->customer ) {
+			wp_send_json_error( array( 'message' => 'customer_unavailable' ), 400 );
+		}
+
+		$data = isset( $_POST['data'] ) ? wp_unslash( $_POST['data'] ) : array();
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
+		$customer = WC()->customer;
+		foreach ( $data as $key => $value ) {
+			$clean_key = sanitize_key( $key );
+			if ( strpos( $clean_key, 'billing_' ) !== 0 && strpos( $clean_key, 'shipping_' ) !== 0 ) {
+				continue;
+			}
+			if ( '' === $value || null === $value ) {
+				continue;
+			}
+			$setter = 'set_' . $clean_key;
+			if ( is_callable( array( $customer, $setter ) ) ) {
+				$customer->$setter( wc_clean( $value ) );
+			}
+		}
+
+		$customer->save();
+		if ( WC()->session ) {
+			WC()->session->set_customer_session_cookie( true );
+		}
+		if ( WC()->cart ) {
+			WC()->cart->calculate_totals();
+		}
+
+		wp_send_json_success( $this->build_cart_payload() );
 	}
 
 	/**
@@ -1292,13 +1430,15 @@ class Trizync_Pop_Cart_Public {
 		}
 
 		$shipping_payload = $this->build_shipping_payload();
-
-		$payment_payload = $this->build_payment_payload();
+		$payment_payload  = $this->build_payment_payload();
+		$coupons_payload  = $this->build_coupon_payload();
 
 		return array(
 			'items'     => $items,
 			'shipping'  => $shipping_payload,
 			'payment'   => $payment_payload,
+			'coupons'   => $coupons_payload,
+			'notices'   => $this->build_notices(),
 			'subtotal'  => WC()->cart->get_cart_subtotal(),
 			'subtotal_raw' => (float) WC()->cart->get_subtotal(),
 			'total'     => WC()->cart->get_total(),
@@ -1477,6 +1617,7 @@ class Trizync_Pop_Cart_Public {
 		$subtotal = $price * $quantity;
 
 		$payment_payload = $this->build_payment_payload();
+		$coupons_payload = $this->build_coupon_payload();
 		$cart_shipping   = $this->build_shipping_payload();
 		$use_cart_rates  = ! empty( $cart_shipping['methods'] );
 		$shipping_total  = function_exists( 'WC' ) && WC()->cart ? (float) WC()->cart->get_shipping_total() : 0.0;
@@ -1504,50 +1645,72 @@ class Trizync_Pop_Cart_Public {
 		);
 
 		if ( $product instanceof WC_Product_Variable ) {
-			$variation_attributes = $product->get_variation_attributes();
-			$attributes_list = array();
-			foreach ( $variation_attributes as $attribute_name => $options ) {
-				$base_name = str_replace( 'attribute_', '', $attribute_name );
-				$label = wc_attribute_label( $base_name );
-				$attributes_list[] = array(
-					'name'    => $base_name,
-					'key'     => 'attribute_' . $base_name,
-					'label'   => $label ? $label : $base_name,
-					'options' => array_values( $options ),
-				);
+			$cache_key = 'trizync_pop_cart_var_' . $product->get_id();
+			$modified = $product->get_date_modified();
+			if ( $modified ) {
+				$cache_key .= '_' . $modified->getTimestamp();
 			}
-
-			$defaults = $product->get_default_attributes();
-			$normalized_defaults = array();
-			foreach ( $defaults as $key => $value ) {
-				$base_key = str_replace( 'attribute_', '', $key );
-				$normalized_defaults[ 'attribute_' . $base_key ] = $value;
-			}
-
-			$variations = array();
-			foreach ( $product->get_available_variations() as $variation_data ) {
-				$variation_product = wc_get_product( $variation_data['variation_id'] );
-				$variation_attrs = array();
-				foreach ( $variation_data['attributes'] as $attr_key => $attr_value ) {
-					$key = strpos( $attr_key, 'attribute_' ) === 0 ? $attr_key : 'attribute_' . $attr_key;
-					$variation_attrs[ $key ] = $attr_value;
+			$cached = get_transient( $cache_key );
+			if ( is_array( $cached ) && isset( $cached['attributes'], $cached['variations'], $cached['defaults'] ) ) {
+				$product_data['attributes'] = $cached['attributes'];
+				$product_data['variations'] = $cached['variations'];
+				$product_data['default_attributes'] = $cached['defaults'];
+			} else {
+				$variation_attributes = $product->get_variation_attributes();
+				$attributes_list = array();
+				foreach ( $variation_attributes as $attribute_name => $options ) {
+					$base_name = str_replace( 'attribute_', '', $attribute_name );
+					$label = wc_attribute_label( $base_name );
+					$attributes_list[] = array(
+						'name'    => $base_name,
+						'key'     => 'attribute_' . $base_name,
+						'label'   => $label ? $label : $base_name,
+						'options' => array_values( $options ),
+					);
 				}
-				$variations[] = array(
-					'id'               => $variation_data['variation_id'],
-					'sku'              => $variation_product ? $variation_product->get_sku() : '',
-					'price_raw'        => isset( $variation_data['display_price'] ) ? (float) $variation_data['display_price'] : ( $variation_product ? (float) $variation_product->get_price() : 0.0 ),
-					'regular_price_raw' => isset( $variation_data['display_regular_price'] ) ? (float) $variation_data['display_regular_price'] : ( $variation_product ? (float) $variation_product->get_regular_price() : 0.0 ),
-					'price_html'       => isset( $variation_data['price_html'] ) ? $variation_data['price_html'] : '',
-					'image'            => isset( $variation_data['image']['src'] ) ? $variation_data['image']['src'] : '',
-					'is_in_stock'      => ! empty( $variation_data['is_in_stock'] ),
-					'is_purchasable'   => ! empty( $variation_data['is_purchasable'] ),
-					'attributes'       => $variation_attrs,
+
+				$defaults = $product->get_default_attributes();
+				$normalized_defaults = array();
+				foreach ( $defaults as $key => $value ) {
+					$base_key = str_replace( 'attribute_', '', $key );
+					$normalized_defaults[ 'attribute_' . $base_key ] = $value;
+				}
+
+				$variations = array();
+				foreach ( $product->get_available_variations() as $variation_data ) {
+					$variation_product = wc_get_product( $variation_data['variation_id'] );
+					$variation_attrs = array();
+					foreach ( $variation_data['attributes'] as $attr_key => $attr_value ) {
+						$key = strpos( $attr_key, 'attribute_' ) === 0 ? $attr_key : 'attribute_' . $attr_key;
+						$variation_attrs[ $key ] = $attr_value;
+					}
+					$variations[] = array(
+						'id'               => $variation_data['variation_id'],
+						'sku'              => $variation_product ? $variation_product->get_sku() : '',
+						'price_raw'        => isset( $variation_data['display_price'] ) ? (float) $variation_data['display_price'] : ( $variation_product ? (float) $variation_product->get_price() : 0.0 ),
+						'regular_price_raw' => isset( $variation_data['display_regular_price'] ) ? (float) $variation_data['display_regular_price'] : ( $variation_product ? (float) $variation_product->get_regular_price() : 0.0 ),
+						'price_html'       => isset( $variation_data['price_html'] ) ? $variation_data['price_html'] : '',
+						'image'            => isset( $variation_data['image']['src'] ) ? $variation_data['image']['src'] : '',
+						'is_in_stock'      => ! empty( $variation_data['is_in_stock'] ),
+						'is_purchasable'   => ! empty( $variation_data['is_purchasable'] ),
+						'attributes'       => $variation_attrs,
+					);
+				}
+
+				$product_data['attributes'] = $attributes_list;
+				$product_data['variations'] = $variations;
+				$product_data['default_attributes'] = $normalized_defaults;
+
+				set_transient(
+					$cache_key,
+					array(
+						'attributes' => $attributes_list,
+						'variations' => $variations,
+						'defaults'   => $normalized_defaults,
+					),
+					5 * MINUTE_IN_SECONDS
 				);
 			}
-
-			$product_data['attributes'] = $attributes_list;
-			$product_data['variations'] = $variations;
-			$product_data['default_attributes'] = $normalized_defaults;
 		}
 
 		return array(
@@ -1569,6 +1732,8 @@ class Trizync_Pop_Cart_Public {
 			),
 			'shipping'  => $use_cart_rates ? $cart_shipping : array(),
 			'payment'   => $payment_payload,
+			'coupons'   => $coupons_payload,
+			'notices'   => $this->build_notices(),
 			'subtotal'  => wc_price( $subtotal ),
 			'subtotal_raw' => (float) $subtotal,
 			'total'     => wc_price( $subtotal + ( $use_cart_rates ? $shipping_total : 0 ) ),
@@ -1762,6 +1927,29 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * Build coupon payload for applied coupons.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function build_coupon_payload() {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return array();
+		}
+
+		$coupons = array();
+		foreach ( WC()->cart->get_coupons() as $code => $coupon ) {
+			$amount = WC()->cart->get_coupon_discount_amount( $code );
+			$coupons[] = array(
+				'code'   => $code,
+				'amount' => wc_price( $amount ),
+			);
+		}
+
+		return $coupons;
+	}
+
+	/**
 	 * Build payment payload for available gateways.
 	 *
 	 * @since 1.0.0
@@ -1780,6 +1968,9 @@ class Trizync_Pop_Cart_Public {
 
 		$payload = array();
 		foreach ( $gateways as $gateway_id => $gateway ) {
+			if ( 'cod' !== $gateway_id ) {
+				continue;
+			}
 			if ( ! $gateway || ! $gateway->enabled ) {
 				continue;
 			}
@@ -1791,8 +1982,11 @@ class Trizync_Pop_Cart_Public {
 			);
 		}
 
-		if ( ! $chosen && ! empty( $payload ) ) {
+		if ( ( ! $chosen || 'cod' !== $chosen ) && ! empty( $payload ) ) {
 			$chosen = $payload[0]['id'];
+		}
+		if ( $chosen && WC()->session ) {
+			WC()->session->set( 'chosen_payment_method', $chosen );
 		}
 
 		return array(

@@ -640,8 +640,23 @@
 		min-width: 0;
 	}
 
-	.trizync-pop-cart__right {
-		flex: 1 1 42%;
-		min-width: 0;
-	}
+.trizync-pop-cart__right {
+	flex: 1 1 42%;
+	min-width: 0;
+}
+}
+
+.trizync-pop-cart__coupon-form {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.trizync-pop-cart__coupon-input {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.trizync-pop-cart__coupon-apply {
+	white-space: nowrap;
 }

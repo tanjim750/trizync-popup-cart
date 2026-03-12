@@ -5,6 +5,18 @@
 		return document.getElementById( 'trizync-pop-cart' );
 	}
 
+	function isCheckoutPage() {
+		if ( document.body && document.body.classList.contains( 'woocommerce-checkout' ) ) {
+			return true;
+		}
+		if ( document.body && document.body.className && document.body.className.indexOf( 'cartflows' ) !== -1 ) {
+			return true;
+		}
+		if ( document.querySelector( 'form.woocommerce-checkout:not(#trizync-pop-cart form.woocommerce-checkout)' ) ) {
+			return true;
+		}
+		return window.location && window.location.pathname ? window.location.pathname.indexOf( '/checkout' ) !== -1 : false;
+	}
 	function applyPopupBranding() {
 		if ( ! window.TrizyncPopCart || ! TrizyncPopCart.branding ) {
 			return;
@@ -520,42 +532,55 @@
 			};
 		}
 
-		function normalizeAttributeKey( key ) {
-			if ( ! key ) {
-				return '';
-			}
-			return key.indexOf( 'attribute_' ) === 0 ? key : 'attribute_' + key;
+	function normalizeAttributeKey( key ) {
+		if ( ! key ) {
+			return '';
 		}
+		return key.indexOf( 'attribute_' ) === 0 ? key : 'attribute_' + key;
+	}
 
-		function isVariationSelectionComplete( productData, attributes ) {
-			if ( ! productData || ! productData.attributes || ! productData.attributes.length ) {
-				return false;
-			}
+	function normalizeVariationValue( value ) {
+		if ( value === null || typeof value === 'undefined' ) {
+			return '';
+		}
+		var text = String( value ).trim().toLowerCase();
+		return text.replace( /\s+/g, '-' );
+	}
+
+	function isVariationSelectionComplete( productData, attributes ) {
+		if ( ! productData || ! productData.attributes || ! productData.attributes.length ) {
+			return false;
+		}
 			return productData.attributes.every( function( attribute ) {
 				return attributes && attributes[ attribute.key ];
 			} );
 		}
 
-		function findMatchingVariation( productData, attributes ) {
-			if ( ! productData || ! productData.variations || ! productData.variations.length ) {
-				return null;
-			}
-			var selected = attributes || {};
-			return productData.variations.find( function( variation ) {
-				var matches = true;
-				Object.keys( variation.attributes || {} ).forEach( function( key ) {
-					var expected = variation.attributes[ key ];
-					var actual = selected[ key ] || '';
-					if ( expected && actual && expected !== actual ) {
-						matches = false;
-					}
-					if ( expected && ! actual ) {
-						matches = false;
-					}
-				} );
-				return matches;
-			} ) || null;
+	function findMatchingVariation( productData, attributes ) {
+		if ( ! productData || ! productData.variations || ! productData.variations.length ) {
+			return null;
 		}
+		var selected = attributes || {};
+		return productData.variations.find( function( variation ) {
+			var matches = true;
+			Object.keys( variation.attributes || {} ).forEach( function( key ) {
+				var expected = variation.attributes[ key ];
+				var actual = selected[ key ] || '';
+				var expectedNorm = normalizeVariationValue( expected );
+				var actualNorm = normalizeVariationValue( actual );
+				if ( ! expectedNorm ) {
+					return;
+				}
+				if ( ! actualNorm ) {
+					matches = false;
+				}
+				if ( expectedNorm && actualNorm && expectedNorm !== actualNorm ) {
+					matches = false;
+				}
+			} );
+			return matches;
+		} ) || null;
+	}
 
 		function renderVariations( productData ) {
 			var popup = getPopup();
@@ -664,8 +689,12 @@
 			var paymentWrap = popup.querySelector( '[data-trizync-pop-cart-payment]' );
 			var paymentEmpty = popup.querySelector( '[data-trizync-pop-cart-payment-empty]' );
 			var paymentList = popup.querySelector( '[data-trizync-pop-cart-payment-list]' );
+			var couponWrap = popup.querySelector( '[data-trizync-pop-cart-coupon]' );
+			var couponList = popup.querySelector( '[data-trizync-pop-cart-coupon-list]' );
+			var couponError = popup.querySelector( '[data-trizync-pop-cart-coupon-error]' );
 			var cta = popup.querySelector( '.trizync-pop-cart__cta' );
 			var checkoutWrap = popup.querySelector( '[data-trizync-pop-cart-checkout]' );
+			var noticesWrap = popup.querySelector( '.woocommerce-notices-wrapper' );
 
 			if ( ! list || ! empty || ! totals || ! subtotal || ! total || ! shippingRow || ! shippingTotal || ! cartLabel || ! overlay || ! paymentWrap || ! paymentEmpty || ! paymentList ) {
 				return;
@@ -697,6 +726,9 @@
 			}
 
 			lastCartPayload = payload || null;
+			if ( payload && typeof payload.notices !== 'undefined' && noticesWrap ) {
+				noticesWrap.innerHTML = payload.notices || '';
+			}
 			if ( payload && typeof payload.itemCount !== 'undefined' && payload.itemCount !== null ) {
 				lastItemCount = parseInt( payload.itemCount, 10 ) || 0;
 			} else if ( payload && payload.items && payload.items.length ) {
@@ -723,6 +755,7 @@
 				}
 				renderVariations( null );
 				renderShipping( null );
+				renderCoupons( payload ? payload.coupons : [] );
 				return;
 			}
 
@@ -839,6 +872,7 @@
 
 			renderShipping( payload.shipping );
 			renderPayment( payload.payment );
+			renderCoupons( payload.coupons || [] );
 			triggerCheckoutEvent( 'updated_checkout', [ payload ] );
 			emitPopcartHook( 'popcart:updated_checkout', buildHookPayload( 'popcart:updated_checkout' ) );
 			if ( initiateCheckoutPending ) {
@@ -1102,6 +1136,126 @@
 			} );
 		}
 
+		var customerUpdateTimer = null;
+		function scheduleCustomerUpdate() {
+			if ( customerUpdateTimer ) {
+				clearTimeout( customerUpdateTimer );
+			}
+			customerUpdateTimer = setTimeout( function() {
+				updateCustomerFromForm();
+			}, 500 );
+		}
+
+		function updateCustomerFromForm() {
+			if ( ! window.TrizyncPopCart ) {
+				return;
+			}
+			var popup = getPopup();
+			if ( ! popup ) {
+				return;
+			}
+			var form = popup.querySelector( 'form.woocommerce-checkout' );
+			if ( ! form ) {
+				return;
+			}
+			var data = {};
+			var fields = form.querySelectorAll( '[name^="billing_"], [name^="shipping_"]' );
+			fields.forEach( function( field ) {
+				if ( field.disabled ) {
+					return;
+				}
+				var name = field.getAttribute( 'name' );
+				if ( ! name ) {
+					return;
+				}
+				if ( field.type === 'checkbox' || field.type === 'radio' ) {
+					if ( ! field.checked ) {
+						return;
+					}
+				}
+				var value = field.value;
+				if ( value === null || typeof value === 'undefined' || String( value ).trim() === '' ) {
+					return;
+				}
+				data[ name ] = value;
+			} );
+			if ( Object.keys( data ).length === 0 ) {
+				return;
+			}
+			$.post(
+				TrizyncPopCart.ajaxUrl,
+				{
+					action: 'trizync_pop_cart_update_customer',
+					nonce: TrizyncPopCart.nonce,
+					data: data
+				}
+			).done( function( response ) {
+				if ( response && response.success && response.data ) {
+					renderCart( response.data );
+					if ( ! response.data.notices && typeof fetchNotices === 'function' ) {
+						fetchNotices();
+					}
+				}
+			} );
+		}
+
+		function applyCoupon( code ) {
+			if ( ! window.TrizyncPopCart ) {
+				return;
+			}
+			$.post(
+				TrizyncPopCart.ajaxUrl,
+				{
+					action: 'trizync_pop_cart_apply_coupon',
+					nonce: TrizyncPopCart.nonce,
+					code: code
+				}
+			).done( function( response ) {
+				if ( response && response.success && response.data ) {
+					renderCart( response.data );
+				} else if ( response && response.data ) {
+					showCouponError( response.data.message || 'Unable to apply coupon.' );
+				}
+			} ).fail( function( xhr ) {
+				var message = 'Unable to apply coupon.';
+				if ( xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ) {
+					message = xhr.responseJSON.data.message;
+				}
+				showCouponError( message );
+			} );
+		}
+
+		function removeCoupon( code ) {
+			if ( ! window.TrizyncPopCart ) {
+				return;
+			}
+			$.post(
+				TrizyncPopCart.ajaxUrl,
+				{
+					action: 'trizync_pop_cart_remove_coupon',
+					nonce: TrizyncPopCart.nonce,
+					code: code
+				}
+			).done( function( response ) {
+				if ( response && response.success && response.data ) {
+					renderCart( response.data );
+				}
+			} );
+		}
+
+		function showCouponError( message ) {
+			var popup = getPopup();
+			if ( ! popup ) {
+				return;
+			}
+			var error = popup.querySelector( '[data-trizync-pop-cart-coupon-error]' );
+			if ( ! error ) {
+				return;
+			}
+			error.textContent = message;
+			error.hidden = false;
+		}
+
 
 		function updateCartItem( key, quantity ) {
 			if ( ! window.TrizyncPopCart ) {
@@ -1277,6 +1431,48 @@
 			syncHiddenSelections();
 		}
 
+		function renderCoupons( coupons ) {
+			var popup = getPopup();
+			if ( ! popup ) {
+				return;
+			}
+			var wrap = popup.querySelector( '[data-trizync-pop-cart-coupon]' );
+			var list = popup.querySelector( '[data-trizync-pop-cart-coupon-list]' );
+			var error = popup.querySelector( '[data-trizync-pop-cart-coupon-error]' );
+			if ( ! wrap || ! list ) {
+				return;
+			}
+			list.innerHTML = '';
+			if ( error ) {
+				error.hidden = true;
+				error.textContent = '';
+			}
+			if ( ! coupons || ! coupons.length ) {
+				wrap.hidden = true;
+				return;
+			}
+			wrap.hidden = false;
+			coupons.forEach( function( coupon ) {
+				var row = document.createElement( 'div' );
+				row.className = 'trizync-pop-cart__coupon-item';
+				var code = document.createElement( 'span' );
+				code.className = 'trizync-pop-cart__coupon-code';
+				code.textContent = coupon.code || '';
+				var amount = document.createElement( 'span' );
+				amount.className = 'trizync-pop-cart__coupon-amount';
+				amount.innerHTML = coupon.amount || '';
+				var remove = document.createElement( 'button' );
+				remove.type = 'button';
+				remove.className = 'trizync-pop-cart__coupon-remove';
+				remove.textContent = '×';
+				remove.setAttribute( 'data-coupon-code', coupon.code || '' );
+				row.appendChild( code );
+				row.appendChild( amount );
+				row.appendChild( remove );
+				list.appendChild( row );
+			} );
+		}
+
 		function setPaymentMethod( methodId ) {
 			if ( ! window.TrizyncPopCart ) {
 				return;
@@ -1419,6 +1615,9 @@
 		document.addEventListener(
 			'click',
 			function( event ) {
+				if ( isCheckoutPage() ) {
+					return;
+				}
 				var popup = getPopup();
 				if ( ! popup ) {
 					return;
@@ -1441,6 +1640,9 @@
 		document.addEventListener(
 			'submit',
 			function( event ) {
+				if ( isCheckoutPage() ) {
+					return;
+				}
 				var popup = getPopup();
 				if ( ! popup ) {
 					return;
@@ -1466,12 +1668,18 @@
 		);
 
 		$( document ).on( 'click', '[data-trizync-pop-cart-open]', function( event ) {
+			if ( isCheckoutPage() ) {
+				return;
+			}
 			event.preventDefault();
 			updateContext( this );
 			openPopup();
 		} );
 
 		$( document ).on( 'click', 'a', function( event ) {
+			if ( isCheckoutPage() ) {
+				return;
+			}
 			var href = this.getAttribute( 'href' ) || '';
 			if ( ! href ) {
 				return;
@@ -1493,6 +1701,9 @@
 		} );
 
 		$( document ).on( 'click', '.checkout-button', function( event ) {
+			if ( isCheckoutPage() ) {
+				return;
+			}
 			event.preventDefault();
 			updateContext( this );
 			openPopup();
@@ -1739,9 +1950,10 @@
 			if ( ! window.TrizyncPopCart || ! TrizyncPopCart.replaceAddToCart ) {
 				return;
 			}
-			event.preventDefault();
-			event.stopImmediatePropagation();
-			handleAddToCartTrigger( this );
+			if ( handleAddToCartTrigger( this ) ) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+			}
 		} );
 
 		document.addEventListener(
@@ -1758,9 +1970,10 @@
 				if ( ! button ) {
 					return;
 				}
-				event.preventDefault();
-				event.stopImmediatePropagation();
-				handleAddToCartTrigger( button );
+				if ( handleAddToCartTrigger( button ) ) {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+				}
 			},
 			true
 		);
@@ -1775,10 +1988,11 @@
 				if ( ! form || ! form.classList || ! form.classList.contains( 'cart' ) ) {
 					return;
 				}
-				event.preventDefault();
-				event.stopImmediatePropagation();
 				var trigger = event.submitter || form.querySelector( '.single_add_to_cart_button' ) || form.querySelector( 'button[type="submit"]' );
-				handleAddToCartTrigger( trigger || form );
+				if ( handleAddToCartTrigger( trigger || form ) ) {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+				}
 			},
 			true
 		);
@@ -1823,6 +2037,47 @@
 			setPaymentMethod( this.value );
 			triggerCheckoutEvent( 'update_checkout' );
 			emitPopcartHook( 'popcart:update_checkout', buildHookPayload( 'popcart:update_checkout', { selection: getSelectionData() } ) );
+		} );
+
+		$( document ).on( 'click', '[data-trizync-pop-cart-coupon-apply]', function() {
+			var popup = getPopup();
+			if ( ! popup ) {
+				return;
+			}
+			var input = popup.querySelector( '[data-trizync-pop-cart-coupon-input]' );
+			if ( ! input ) {
+				return;
+			}
+			var code = ( input.value || '' ).trim();
+			if ( ! code ) {
+				showCouponError( 'Please enter a coupon code.' );
+				return;
+			}
+			applyCoupon( code );
+		} );
+
+		$( document ).on( 'keydown', '[data-trizync-pop-cart-coupon-input]', function( event ) {
+			if ( event.key === 'Enter' ) {
+				event.preventDefault();
+				var code = ( this.value || '' ).trim();
+				if ( code ) {
+					applyCoupon( code );
+				} else {
+					showCouponError( 'Please enter a coupon code.' );
+				}
+			}
+		} );
+
+		$( document ).on( 'click', '[data-trizync-pop-cart-coupon-remove]', function() {
+			var code = this.getAttribute( 'data-coupon-code' ) || '';
+			if ( ! code ) {
+				return;
+			}
+			removeCoupon( code );
+		} );
+
+		$( document ).on( 'input change', '#trizync-pop-cart form.woocommerce-checkout [name^="billing_"], #trizync-pop-cart form.woocommerce-checkout [name^="shipping_"]', function() {
+			scheduleCustomerUpdate();
 		} );
 
 		$( document ).on( 'change', '[data-trizync-pop-cart-variation-select]', function() {

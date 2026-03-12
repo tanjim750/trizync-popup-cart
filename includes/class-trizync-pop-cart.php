@@ -199,6 +199,12 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_notices', $plugin_public, 'ajax_get_notices' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_checkout_form', $plugin_public, 'ajax_get_checkout_form' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_checkout_form', $plugin_public, 'ajax_get_checkout_form' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_apply_coupon', $plugin_public, 'ajax_apply_coupon' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_apply_coupon', $plugin_public, 'ajax_apply_coupon' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_remove_coupon', $plugin_public, 'ajax_remove_coupon' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_remove_coupon', $plugin_public, 'ajax_remove_coupon' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_update_customer', $plugin_public, 'ajax_update_customer' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_update_customer', $plugin_public, 'ajax_update_customer' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_notices', $plugin_public, 'ajax_get_notices' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_notices', $plugin_public, 'ajax_get_notices' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_checkout_form', $plugin_public, 'ajax_get_checkout_form' );
