@@ -128,7 +128,7 @@ console.log('Pop Cart hook:', data.action, data);
 This README focuses on usage and configuration. For advanced customization, use the Custom Scripts section in the admin panel.
 
 ## About ZyncOps
-Pop Cart is built by ZyncOps, the e‑commerce growth team at Trizync. If you want hands‑on help to improve conversion, optimize checkout flow, or ship custom WooCommerce features, ZyncOps can help you move faster without disrupting your current store.
+ZyncOps is the e‑commerce growth team at Trizync. If you want hands‑on help to improve conversion, optimize checkout flow, or ship custom WooCommerce features, ZyncOps can help you move faster without disrupting your current store.
 
 **Contact**: 01873316706  
 **Website**: `https://triizync.com/`
