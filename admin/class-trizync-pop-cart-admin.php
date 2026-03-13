@@ -55,6 +55,20 @@ class Trizync_Pop_Cart_Admin {
 	}
 
 	/**
+	 * Suppress global admin notices on the Pop Cart settings page.
+	 *
+	 * @since    1.0.0
+	 */
+	public function suppress_admin_notices() {
+		if ( empty( $_GET['page'] ) || 'trizync-pop-cart' !== $_GET['page'] ) {
+			return;
+		}
+
+		remove_all_actions( 'admin_notices' );
+		remove_all_actions( 'all_admin_notices' );
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    1.0.0
@@ -335,9 +349,14 @@ class Trizync_Pop_Cart_Admin {
 				settings_fields( 'trizync_pop_cart_settings' );
 				?>
 				<div class="trizync-pop-cart-admin__hero">
-				<div>
-					<p class="trizync-pop-cart-admin__eyebrow"><?php esc_html_e( 'Popup Checkout', 'trizync-pop-cart' ); ?></p>
-					<h1 class="trizync-pop-cart-admin__title"><?php esc_html_e( 'Pop Cart Settings', 'trizync-pop-cart' ); ?></h1>
+				<div class="trizync-pop-cart-admin__hero-content">
+					<div class="trizync-pop-cart-admin__brand">
+						<img class="trizync-pop-cart-admin__logo" src="<?php echo esc_url( plugin_dir_url( __FILE__ ) . '../public/images/trizync-logo.png' ); ?>" alt="<?php esc_attr_e( 'Trizync', 'trizync-pop-cart' ); ?>">
+						<div class="trizync-pop-cart-admin__brand-text">
+							<p class="trizync-pop-cart-admin__eyebrow"><?php esc_html_e( 'Popup Checkout', 'trizync-pop-cart' ); ?></p>
+							<h1 class="trizync-pop-cart-admin__title"><?php esc_html_e( 'Pop Cart Settings', 'trizync-pop-cart' ); ?></h1>
+						</div>
+					</div>
 					<p class="trizync-pop-cart-admin__subtitle"><?php esc_html_e( 'Design your checkout flow, customize fields, and keep it lightning fast.', 'trizync-pop-cart' ); ?></p>
 				</div>
 				<div class="trizync-pop-cart-admin__status">
@@ -346,6 +365,18 @@ class Trizync_Pop_Cart_Admin {
 						<option value="0" <?php selected( 0, (int) get_option( TRIZYNC_POP_CART_OPTION_ENABLED, 1 ) ); ?>><?php esc_html_e( 'Disabled', 'trizync-pop-cart' ); ?></option>
 					</select>
 					<?php submit_button( __( 'Save Settings', 'trizync-pop-cart' ), 'primary trizync-pop-cart-admin__pill', 'submit', false, array( 'class' => 'trizync-pop-cart-admin__save' ) ); ?>
+				</div>
+			</div>
+			<div class="trizync-pop-cart-admin__marketing">
+				<p class="trizync-pop-cart-admin__marketing-text">
+					<?php esc_html_e( 'বাংলাদেশি মার্কেটের জন্য দ্রুত কনভার্সন‑ফোকাসড WooCommerce সেটআপ, কাস্টমাইজেশন বা অপ্টিমাইজেশন দরকার?', 'trizync-pop-cart' ); ?>
+					<?php esc_html_e( 'ZyncOps আপনার স্টোর দ্রুত লঞ্চ, অপ্টিমাইজ ও স্কেল করতে সাহায্য করবে।', 'trizync-pop-cart' ); ?>
+				</p>
+				<div class="trizync-pop-cart-admin__marketing-cta">
+					<span><?php esc_html_e( 'যোগাযোগ: 01873316706', 'trizync-pop-cart' ); ?></span>
+					<a href="<?php echo esc_url( 'https://zyncops.triizync.com/' ); ?>" target="_blank" rel="noopener noreferrer">
+						<?php esc_html_e( 'ZyncOps ভিজিট করুন', 'trizync-pop-cart' ); ?>
+					</a>
 				</div>
 			</div>
 				<div class="trizync-pop-cart-admin__grid">

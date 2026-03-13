@@ -875,10 +875,10 @@
 			renderCoupons( payload.coupons || [] );
 			triggerCheckoutEvent( 'updated_checkout', [ payload ] );
 			emitPopcartHook( 'popcart:updated_checkout', buildHookPayload( 'popcart:updated_checkout' ) );
-			if ( initiateCheckoutPending ) {
-				fireInitiateCheckout( payload );
-				initiateCheckoutPending = false;
-			}
+			// if ( initiateCheckoutPending ) {
+			// 	fireInitiateCheckout( payload );
+			// 	initiateCheckoutPending = false;
+			// }
 			updateCtaState();
 		}
 

@@ -418,13 +418,76 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: flex-start;
-	gap: 16px;
+	gap: 20px;
 	margin-bottom: 24px;
 	background: #ffffff;
 	border-radius: 18px;
 	padding: 24px;
 	box-shadow: 0 16px 36px rgba(35, 15, 60, 0.1);
 	border: 1px solid rgba(65, 18, 100, 0.1);
+}
+
+.trizync-pop-cart-admin__hero-content {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	flex: 1;
+}
+
+.trizync-pop-cart-admin__brand {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+.trizync-pop-cart-admin__brand-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.trizync-pop-cart-admin__marketing {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	padding: 16px 20px;
+	margin-bottom: 24px;
+	background: linear-gradient(120deg, rgba(65, 18, 100, 0.08), rgba(240, 166, 10, 0.08));
+	border: 1px solid rgba(65, 18, 100, 0.12);
+	border-radius: 16px;
+}
+
+.trizync-pop-cart-admin__marketing-text {
+	margin: 0;
+	color: #2d1f3a;
+	font-weight: 600;
+}
+
+.trizync-pop-cart-admin__marketing-cta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	color: #2d1f3a;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.trizync-pop-cart-admin__marketing-cta a {
+	color: #ffffff;
+	text-decoration: none;
+	font-weight: 700;
+	background: var(--trizync-primary);
+	padding: 8px 14px;
+	border-radius: 999px;
+	box-shadow: 0 10px 20px rgba(65, 18, 100, 0.2);
+}
+
+.trizync-pop-cart-admin__marketing-cta a:hover {
+	filter: brightness(0.95);
+	text-decoration: none;
 }
 
 .trizync-pop-cart-admin__hero .notice,
@@ -442,9 +505,17 @@
 	font-weight: 700;
 }
 
+.trizync-pop-cart-admin__logo {
+	display: block;
+	width: 100px;
+	height: auto;
+	margin: 0;
+}
+
 .trizync-pop-cart-admin__title {
-	margin: 0 0 8px;
+	margin: 0;
 	font-size: 28px;
+	line-height: 1.15;
 }
 
 .trizync-pop-cart-admin__subtitle {
@@ -457,6 +528,7 @@
 	display: flex;
 	align-items: center;
 	gap: 12px;
+	margin-top: 6px;
 }
 
 .trizync-pop-cart-admin .trizync-pop-cart-admin__status-select {

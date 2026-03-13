@@ -977,14 +977,6 @@ class Trizync_Pop_Cart_Public {
 		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
 		$quantity   = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
 		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
-		$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
-		$attributes = array();
-		if ( $attributes_raw ) {
-			$decoded = json_decode( $attributes_raw, true );
-			if ( is_array( $decoded ) ) {
-				$attributes = $decoded;
-			}
-		}
 		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
 		$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
 		$attributes = array();
@@ -1321,7 +1313,16 @@ class Trizync_Pop_Cart_Public {
 
 		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
 		$quantity   = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
-
+		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
+		$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
+		$attributes = array();
+		if ( $attributes_raw ) {
+			$decoded = json_decode( $attributes_raw, true );
+			if ( is_array( $decoded ) ) {
+				$attributes = $decoded;
+			}
+		}
+		
 		if ( ! $product_id ) {
 			wp_send_json_error( array( 'message' => 'missing_product' ), 400 );
 		}
