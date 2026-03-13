@@ -23,7 +23,7 @@ Pop‑up checkout for WooCommerce with a fast, branded checkout drawer that supp
 - Custom script slots for analytics and integrations.
 
 ## Admin Settings
-All settings are under **Pop Cart Settings**.
+All settings are under **Pop Cart Settings** in WP Admin → **Settings** → **Pop Cart**.
 
 ### General
 - **Status**: Enable/disable popup checkout.
@@ -61,6 +61,56 @@ Recommended uses:
 - Third‑party widgets or tracking
 - Custom logic needed for your storefront
 
+#### Available Hooks
+Use these hook names in the Custom Scripts dropdown:
+- `popcart:boot`
+- `popcart:open:start`
+- `popcart:checkout:attempt`
+- `popcart:checkout:blocked`
+- `popcart:checkout:submit`
+- `popcart:checkout:error`
+- `popcart:checkout:success`
+- `popcart:close`
+- `popcart:cleanup`
+- `popcart:init_checkout`
+- `popcart:updated_checkout`
+- `popcart:update_checkout`
+- `popcart:checkout_error`
+- `popcart:woocommerce_before_checkout_form`
+- `popcart:woocommerce_checkout_before_customer_details`
+- `popcart:woocommerce_checkout_billing`
+- `popcart:woocommerce_checkout_shipping`
+- `popcart:woocommerce_checkout_after_customer_details`
+- `popcart:woocommerce_checkout_before_order_review`
+- `popcart:woocommerce_checkout_order_review`
+- `popcart:woocommerce_checkout_after_order_review`
+- `popcart:woocommerce_after_checkout_form`
+
+#### Payload (What You Receive)
+Every hook provides a data object with the current cart and product context. Typical fields:
+- `action` (hook name)
+- `popup_type` (`cart` or `product`)
+- `cart` (items_count, qty_total, subtotal, total, currency)
+- `cart_items` (product list with id, name, qty, price, image, permalink)
+- `product` (selected product for product popup)
+- `selection` (variation_id + attributes when applicable)
+- `errors` (array of error messages if any)
+- `page_url` (current page URL)
+- `timestamp` and `meta.session_id`
+
+#### Example Script
+```js
+// Example: Google Analytics begin_checkout + simple console log
+if (typeof gtag === 'function') {
+  gtag('event', 'begin_checkout', {
+    currency: data.cart?.currency,
+    value: data.cart?.total_raw,
+    items: data.cart_items || []
+  });
+}
+console.log('Pop Cart hook:', data.action, data);
+```
+
 ## How to Use
 1. Enable **Status** in **General**.
 2. Choose whether to **Replace Add‑to‑Cart** or use the optional **Product Button**.
@@ -81,4 +131,4 @@ This README focuses on usage and configuration. For advanced customization, use 
 Pop Cart is built by ZyncOps, the e‑commerce growth team at Trizync. If you want hands‑on help to improve conversion, optimize checkout flow, or ship custom WooCommerce features, ZyncOps can help you move faster without disrupting your current store.
 
 **Contact**: 01873316706  
-**Website**: `https://zyncops.triizync.com/`
+**Website**: `https://triizync.com/`
