@@ -124,6 +124,8 @@ class Trizync_Pop_Cart_Public {
 				'scripts'  => $this->get_scripts_settings(),
 				'scriptsEnabled' => (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 ),
 				'replaceAddToCart' => $this->is_replace_add_to_cart_enabled(),
+				'replaceAddToCartLabel' => $this->get_replace_add_to_cart_label(),
+				'customButtonSelectors' => get_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS, '' ),
 				'branding' => array_merge(
 					$this->get_branding_settings(),
 					array(
@@ -199,7 +201,7 @@ class Trizync_Pop_Cart_Public {
 		$quantity     = $this->get_cart_quantity_for_product( $product_id );
 
 		printf(
-			'<button type="button" class="button trizync-pop-cart-trigger trizync-pop-cart-trigger--product trizync-pop-cart-trigger--brand" data-trizync-pop-cart-open="product" data-product-id="%d" data-product-name="%s" data-quantity="%d">%s</button>',
+			'<button type="button" class="trizync-pop-cart-trigger trizync-pop-cart-trigger--product trizync-pop-cart-trigger--brand" data-trizync-pop-cart-open="product" data-product-id="%d" data-product-name="%s" data-quantity="%d">%s</button>',
 			(int) $product_id,
 			esc_attr( $product_name ),
 			(int) $quantity,
@@ -234,7 +236,8 @@ class Trizync_Pop_Cart_Public {
 		}
 
 		$attributes = sprintf(
-			' data-trizync-pop-cart-open="product" data-product-id="%d" data-product-name="%s" data-quantity="%d"',
+			' data-trizync-pop-cart-open="product" data-product-id="%d" data-zyncops-post-data-id="%d" data-product-name="%s" data-quantity="%d"',
+			(int) $product_id,
 			(int) $product_id,
 			esc_attr( $product_name ),
 			(int) $quantity
@@ -244,7 +247,54 @@ class Trizync_Pop_Cart_Public {
 			return $button;
 		}
 
-		return preg_replace( '/<a\s/i', '<a' . $attributes . ' ', $button, 1 );
+		$button = preg_replace( '/<a\s/i', '<a' . $attributes . ' ', $button, 1 );
+
+		if ( $this->is_replace_add_to_cart_enabled() ) {
+			$label = esc_html( $this->get_replace_add_to_cart_label() );
+			$button = preg_replace( '/>(.*?)<\/a>/s', '><span class="trizync-pop-cart__label">' . $label . '</span></a>', $button, 1 );
+		}
+
+		return $button;
+	}
+
+	/**
+	 * Override the default product loop link opener to add data attribute.
+	 *
+	 * @since 1.0.0
+	 */
+	public function override_loop_product_link_open() {
+		if ( ! $this->is_enabled() ) {
+			return;
+		}
+		if ( ! function_exists( 'remove_action' ) || ! function_exists( 'add_action' ) ) {
+			return;
+		}
+		remove_action( 'woocommerce_before_shop_loop_item', 'woocommerce_template_loop_product_link_open', 10 );
+		add_action( 'woocommerce_before_shop_loop_item', array( $this, 'render_loop_product_link_open' ), 10 );
+	}
+
+	/**
+	 * Render product loop link opener with zyncops product id attribute.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_loop_product_link_open() {
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return;
+		}
+
+		global $product;
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$product_id = $product->get_id();
+		$link = apply_filters( 'woocommerce_loop_product_link', get_the_permalink(), $product );
+		printf(
+			'<a href="%1$s" class="woocommerce-LoopProduct-link woocommerce-loop-product__link" data-zyncops-post-data-id="%2$d">',
+			esc_url( $link ),
+			(int) $product_id
+		);
 	}
 
 	/**
@@ -362,8 +412,8 @@ class Trizync_Pop_Cart_Public {
 								</div>
 							</div>
 						</div>
-						<div class="trizync-pop-cart__right">
-							<div class="woocommerce-notices-wrapper"></div>
+					<div class="trizync-pop-cart__right">
+						<div class="trizync-pop-cart__notices"></div>
 							<div class="trizync-pop-cart__checkout" data-trizync-pop-cart-checkout></div>
 						</div>
 					</div>
@@ -375,6 +425,19 @@ class Trizync_Pop_Cart_Public {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Apply checkout field filters for Pop Cart checkout requests.
+	 *
+	 * @since 1.0.0
+	 */
+	public function maybe_enable_popcart_checkout_filters() {
+		if ( empty( $_REQUEST['trizync_pop_cart'] ) ) {
+			return;
+		}
+		add_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
+		add_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
 	}
 
 	/**
@@ -580,7 +643,7 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
-	 * Render WooCommerce checkout form inside popup.
+	 * Render Pop Cart custom checkout fields inside popup.
 	 *
 	 * @since 1.0.0
 	 */
@@ -591,41 +654,109 @@ class Trizync_Pop_Cart_Public {
 
 		$this->ensure_cart_loaded();
 
-		if ( ! function_exists( 'wc_get_template' ) ) {
-			return;
-		}
-
 		$checkout = WC()->checkout();
 		if ( ! $checkout ) {
 			return;
 		}
 
-		add_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
-		add_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
-		add_filter( 'woocommerce_is_checkout', '__return_true' );
-		add_action( 'woocommerce_checkout_before_order_review', array( $this, 'render_popup_hidden_fields' ) );
+		$fields = $this->get_enabled_fields_config();
+		?>
+		<form class="trizync-pop-cart__form" data-trizync-pop-cart-form>
+			<?php $this->render_popup_hidden_fields(); ?>
+			<div class="trizync-pop-cart__fields">
+				<?php foreach ( $fields as $field ) : ?>
+					<?php
+					$key = sanitize_key( $field['key'] );
+					if ( ! $key ) {
+						continue;
+					}
+					$label = isset( $field['label'] ) ? $field['label'] : $key;
+					$placeholder = isset( $field['placeholder'] ) ? $field['placeholder'] : '';
+					$default_value = isset( $field['default'] ) ? $field['default'] : '';
+					$required = isset( $field['rule'] ) && 'required' === $field['rule'];
+					$type = isset( $field['type'] ) ? $field['type'] : 'text';
+					$value = $checkout->get_value( $key );
+					if ( '' === $value && '' !== $default_value ) {
+						$value = $default_value;
+					}
+					if ( 'billing_email' === $key ) {
+						$type = 'email';
+					} elseif ( 'billing_phone' === $key ) {
+						$type = 'tel';
+					}
+					?>
+					<div class="trizync-pop-cart__field" data-field-key="<?php echo esc_attr( $key ); ?>">
+						<label class="trizync-pop-cart__label" for="<?php echo esc_attr( $key ); ?>">
+							<?php echo esc_html( $label ); ?>
+							<?php if ( $required ) : ?>
+								<span class="trizync-pop-cart__required">*</span>
+							<?php endif; ?>
+						</label>
+						<?php if ( 'select' === $type ) : ?>
+							<select class="trizync-pop-cart__select" name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" <?php echo $required ? 'required aria-required="true"' : ''; ?>>
+								<?php if ( $placeholder ) : ?>
+									<option value=""><?php echo esc_html( $placeholder ); ?></option>
+								<?php endif; ?>
+								<?php
+								$options = isset( $field['options'] ) && is_array( $field['options'] ) ? $field['options'] : array();
+								foreach ( $options as $option ) :
+									$option_value = (string) $option;
+									?>
+									<option value="<?php echo esc_attr( $option_value ); ?>" <?php selected( $value, $option_value ); ?>>
+										<?php echo esc_html( $option_value ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						<?php elseif ( 'textarea' === $type ) : ?>
+							<textarea class="trizync-pop-cart__textarea" name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" placeholder="<?php echo esc_attr( $placeholder ); ?>" <?php echo $required ? 'required aria-required="true"' : ''; ?>><?php echo esc_textarea( $value ); ?></textarea>
+						<?php else : ?>
+							<input class="trizync-pop-cart__input" type="<?php echo esc_attr( $type ); ?>" name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" placeholder="<?php echo esc_attr( $placeholder ); ?>" value="<?php echo esc_attr( $value ); ?>" <?php echo $required ? 'required aria-required="true"' : ''; ?>>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		</form>
+		<?php
+	}
 
-		$removed_order_review = false;
-		if ( has_action( 'woocommerce_checkout_order_review', 'woocommerce_order_review' ) ) {
-			remove_action( 'woocommerce_checkout_order_review', 'woocommerce_order_review', 10 );
-			$removed_order_review = true;
+	/**
+	 * Get enabled field configuration for popup rendering.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function get_enabled_fields_config() {
+		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_FIELDS' ) ) {
+			return array();
 		}
-		if ( has_action( 'woocommerce_checkout_order_review', 'woocommerce_checkout_payment' ) ) {
-			remove_action( 'woocommerce_checkout_order_review', 'woocommerce_checkout_payment', 20 );
-			$removed_order_review = true;
+
+		$raw = get_option( TRIZYNC_POP_CART_OPTION_FIELDS );
+		if ( empty( $raw ) ) {
+			return array();
 		}
 
-		wc_get_template( 'checkout/form-checkout.php', array( 'checkout' => $checkout ) );
-
-		remove_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
-		remove_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
-		remove_filter( 'woocommerce_is_checkout', '__return_true' );
-		remove_action( 'woocommerce_checkout_before_order_review', array( $this, 'render_popup_hidden_fields' ) );
-
-		if ( $removed_order_review ) {
-			add_action( 'woocommerce_checkout_order_review', 'woocommerce_order_review', 10 );
-			add_action( 'woocommerce_checkout_order_review', 'woocommerce_checkout_payment', 20 );
+		$config = json_decode( $raw, true );
+		if ( ! is_array( $config ) ) {
+			return array();
 		}
+
+		$enabled = array();
+		foreach ( $config as $field ) {
+			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+			$field['order'] = isset( $field['order'] ) ? absint( $field['order'] ) : 0;
+			$enabled[] = $field;
+		}
+
+		usort(
+			$enabled,
+			function( $a, $b ) {
+				return (int) $a['order'] <=> (int) $b['order'];
+			}
+		);
+
+		return $enabled;
 	}
 
 	/**
@@ -638,6 +769,7 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 		wp_nonce_field( 'woocommerce-process_checkout', 'woocommerce-process-checkout-nonce' );
+		echo '<input type="hidden" name="trizync_pop_cart" value="1">';
 		echo '<input type="hidden" name="woocommerce_checkout_place_order" value="1" data-trizync-pop-cart-place-order>';
 		echo '<input type="hidden" name="payment_method" value="" data-trizync-pop-cart-payment-input>';
 		echo '<input type="hidden" name="shipping_method[0]" value="" data-trizync-pop-cart-shipping-input>';
@@ -675,6 +807,31 @@ class Trizync_Pop_Cart_Public {
 		$config = json_decode( $raw, true );
 		if ( ! is_array( $config ) ) {
 			return $fields;
+		}
+
+		$enabled_keys = array();
+		foreach ( $config as $field ) {
+			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+			$enabled_keys[] = sanitize_key( $field['key'] );
+		}
+
+		foreach ( $fields as $group => $group_fields ) {
+			if ( ! is_array( $group_fields ) ) {
+				continue;
+			}
+			foreach ( $group_fields as $key => &$field_data ) {
+				if ( empty( $key ) ) {
+					continue;
+				}
+				$clean_key = sanitize_key( $key );
+				if ( ! in_array( $clean_key, $enabled_keys, true ) ) {
+					$field_data['required'] = false;
+					unset( $fields[ $group ][ $key ] );
+				}
+			}
+			unset( $field_data );
 		}
 
 		$custom = array(
@@ -979,6 +1136,7 @@ class Trizync_Pop_Cart_Public {
 		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
 		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
 		$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
+		$replace_cart_only = ! empty( $_POST['replace_cart_only'] );
 		$attributes = array();
 		if ( $attributes_raw ) {
 			$decoded = json_decode( $attributes_raw, true );
@@ -1336,12 +1494,19 @@ class Trizync_Pop_Cart_Public {
 			wp_send_json_error( array( 'message' => 'missing_variation' ), 400 );
 		}
 
-		$this->snapshot_cart();
+		if ( $replace_cart_only && WC()->session ) {
+			WC()->session->__unset( 'trizync_pop_cart_product_checkout' );
+			WC()->session->__unset( 'trizync_pop_cart_snapshot' );
+		} else {
+			$this->snapshot_cart();
+		}
 		WC()->cart->empty_cart( true );
 		WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
 		WC()->cart->calculate_totals();
 
-		WC()->session->set( 'trizync_pop_cart_product_checkout', 1 );
+		if ( ! $replace_cart_only && WC()->session ) {
+			WC()->session->set( 'trizync_pop_cart_product_checkout', 1 );
+		}
 
 		$this->trigger_backend_checkout_hooks( 'prepare_product_checkout' );
 		wp_send_json_success( $this->build_cart_payload() );
@@ -1459,7 +1624,8 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
-		if ( WC()->session->get( 'trizync_pop_cart_snapshot' ) ) {
+		$existing_snapshot = WC()->session->get( 'trizync_pop_cart_snapshot' );
+		if ( ! empty( $existing_snapshot ) ) {
 			return;
 		}
 
@@ -1494,6 +1660,10 @@ class Trizync_Pop_Cart_Public {
 		$snapshot = WC()->session->get( 'trizync_pop_cart_snapshot' );
 
 		if ( ! $flag || empty( $snapshot ) || ! is_array( $snapshot ) ) {
+			if ( $flag ) {
+				WC()->session->__unset( 'trizync_pop_cart_product_checkout' );
+				WC()->session->__unset( 'trizync_pop_cart_snapshot' );
+			}
 			return;
 		}
 
@@ -1626,6 +1796,13 @@ class Trizync_Pop_Cart_Public {
 			'payload'   => $cart_shipping,
 			'total_raw' => $shipping_total,
 		);
+		if ( ! $use_cart_rates ) {
+			$product_shipping = $this->build_shipping_payload_for_product( $display_product, $quantity );
+			if ( ! empty( $product_shipping['payload'] ) && ! empty( $product_shipping['payload']['methods'] ) ) {
+				$shipping_payload = $product_shipping;
+				$use_cart_rates = true;
+			}
+		}
 
 		$product_type = $product->get_type();
 		$product_data = array(
@@ -1714,6 +1891,8 @@ class Trizync_Pop_Cart_Public {
 			}
 		}
 
+		$shipping_amount = $use_cart_rates ? (float) $shipping_payload['total_raw'] : 0.0;
+
 		return array(
 			'items'     => array(
 				array(
@@ -1731,14 +1910,14 @@ class Trizync_Pop_Cart_Public {
 					'permalink' => get_permalink( $display_product->get_id() ),
 				),
 			),
-			'shipping'  => $use_cart_rates ? $cart_shipping : array(),
+			'shipping'  => $use_cart_rates ? $shipping_payload['payload'] : array(),
 			'payment'   => $payment_payload,
 			'coupons'   => $coupons_payload,
 			'notices'   => $this->build_notices(),
 			'subtotal'  => wc_price( $subtotal ),
 			'subtotal_raw' => (float) $subtotal,
-			'total'     => wc_price( $subtotal + ( $use_cart_rates ? $shipping_total : 0 ) ),
-			'total_raw' => (float) ( $subtotal + ( $use_cart_rates ? $shipping_total : 0 ) ),
+			'total'     => wc_price( $subtotal + $shipping_amount ),
+			'total_raw' => (float) ( $subtotal + $shipping_amount ),
 			'hash'      => '',
 			'itemCount' => $quantity,
 			'product'   => $product_data,
@@ -1772,6 +1951,14 @@ class Trizync_Pop_Cart_Public {
 		$customer       = WC()->customer;
 		$destination    = array();
 
+		$countries = WC()->countries;
+		$base_country  = $countries ? $countries->get_base_country() : '';
+		$base_state    = $countries ? $countries->get_base_state() : '';
+		$base_postcode = $countries ? $countries->get_base_postcode() : '';
+		$base_city     = $countries ? $countries->get_base_city() : '';
+		$allowed_countries = $countries ? $countries->get_allowed_countries() : array();
+		$first_allowed = ! empty( $allowed_countries ) ? array_key_first( $allowed_countries ) : '';
+
 		if ( $customer ) {
 			$destination = array(
 				'country'   => $customer->get_shipping_country() ? $customer->get_shipping_country() : $customer->get_billing_country(),
@@ -1781,6 +1968,22 @@ class Trizync_Pop_Cart_Public {
 				'address'   => $customer->get_shipping_address() ? $customer->get_shipping_address() : $customer->get_billing_address(),
 				'address_2' => $customer->get_shipping_address_2() ? $customer->get_shipping_address_2() : $customer->get_billing_address_2(),
 			);
+		}
+
+		if ( empty( $destination['country'] ) && $base_country ) {
+			$destination['country'] = $base_country;
+		}
+		if ( empty( $destination['country'] ) && $first_allowed ) {
+			$destination['country'] = $first_allowed;
+		}
+		if ( empty( $destination['state'] ) && $base_state ) {
+			$destination['state'] = $base_state;
+		}
+		if ( empty( $destination['postcode'] ) && $base_postcode ) {
+			$destination['postcode'] = $base_postcode;
+		}
+		if ( empty( $destination['city'] ) && $base_city ) {
+			$destination['city'] = $base_city;
 		}
 
 		$package = array(
@@ -1803,21 +2006,18 @@ class Trizync_Pop_Cart_Public {
 		$rates = WC()->shipping()->calculate_shipping_for_package( $package );
 
 		if ( empty( $rates ) ) {
-			if ( WC()->cart ) {
-				$cart_shipping = $this->build_shipping_payload();
-				$cart_total    = WC()->cart->get_shipping_total();
+			$cart_shipping = $this->build_shipping_payload();
+			$cart_total    = WC()->cart ? WC()->cart->get_shipping_total() : 0;
+			if ( ! empty( $cart_shipping['methods'] ) ) {
 				return array(
 					'payload'   => $cart_shipping,
 					'total_raw' => (float) $cart_total,
 				);
 			}
+			$fallback = $this->build_shipping_methods_fallback();
 			return array(
-				'payload'   => array(
-					'methods' => array(),
-					'chosen'  => '',
-					'total'   => '',
-				),
-				'total_raw' => 0,
+				'payload'   => $fallback,
+				'total_raw' => isset( $fallback['total_raw'] ) ? (float) $fallback['total_raw'] : 0,
 			);
 		}
 
@@ -1847,9 +2047,10 @@ class Trizync_Pop_Cart_Public {
 
 		return array(
 			'payload'   => array(
-				'methods' => $methods,
-				'chosen'  => $chosen_method,
-				'total'   => wc_price( $shipping_cost ),
+				'methods'   => $methods,
+				'chosen'    => $chosen_method,
+				'total'     => wc_price( $shipping_cost ),
+				'total_raw' => $shipping_cost,
 			),
 			'total_raw' => $shipping_cost,
 		);
@@ -1872,26 +2073,47 @@ class Trizync_Pop_Cart_Public {
 			);
 		}
 
+		if ( WC()->customer && WC()->countries ) {
+			$base_country  = WC()->countries->get_base_country();
+			$base_state    = WC()->countries->get_base_state();
+			$base_postcode = WC()->countries->get_base_postcode();
+			$base_city     = WC()->countries->get_base_city();
+			$allowed_countries = WC()->countries->get_allowed_countries();
+			$first_allowed = ! empty( $allowed_countries ) ? array_key_first( $allowed_countries ) : '';
+
+			if ( ! WC()->customer->get_shipping_country() && ! WC()->customer->get_billing_country() ) {
+				$default_country = $base_country ? $base_country : $first_allowed;
+				if ( $default_country ) {
+					WC()->customer->set_billing_country( $default_country );
+					WC()->customer->set_shipping_country( $default_country );
+				}
+			}
+			if ( ! WC()->customer->get_shipping_state() && ! WC()->customer->get_billing_state() && $base_state ) {
+				WC()->customer->set_billing_state( $base_state );
+				WC()->customer->set_shipping_state( $base_state );
+			}
+			if ( ! WC()->customer->get_shipping_postcode() && ! WC()->customer->get_billing_postcode() && $base_postcode ) {
+				WC()->customer->set_billing_postcode( $base_postcode );
+				WC()->customer->set_shipping_postcode( $base_postcode );
+			}
+			if ( ! WC()->customer->get_shipping_city() && ! WC()->customer->get_billing_city() && $base_city ) {
+				WC()->customer->set_billing_city( $base_city );
+				WC()->customer->set_shipping_city( $base_city );
+			}
+		}
+
 		WC()->cart->calculate_shipping();
 		$packages = WC()->shipping()->get_packages();
 
 		if ( empty( $packages ) ) {
-			return array(
-				'methods' => array(),
-				'chosen'  => '',
-				'total'   => '',
-			);
+			return $this->build_shipping_methods_fallback();
 		}
 
 		$package = $packages[0];
 		$rates   = isset( $package['rates'] ) ? $package['rates'] : array();
 
 		if ( empty( $rates ) ) {
-			return array(
-				'methods' => array(),
-				'chosen'  => '',
-				'total'   => '',
-			);
+			return $this->build_shipping_methods_fallback();
 		}
 
 		$chosen_methods = WC()->session ? WC()->session->get( 'chosen_shipping_methods' ) : array();
@@ -1921,9 +2143,88 @@ class Trizync_Pop_Cart_Public {
 		$shipping_total = WC()->cart->get_shipping_total();
 
 		return array(
-			'methods' => $methods,
-			'chosen'  => $chosen_method,
-			'total'   => wc_price( $shipping_total ),
+			'methods'   => $methods,
+			'chosen'    => $chosen_method,
+			'total'     => wc_price( $shipping_total ),
+			'total_raw' => (float) $shipping_total,
+		);
+	}
+
+	/**
+	 * Fallback shipping methods when no rates are available.
+	 *
+	 * @since 1.0.0
+	 * @return array
+	 */
+	private function build_shipping_methods_fallback() {
+		if ( ! function_exists( 'WC' ) || ! WC()->shipping() ) {
+			return array(
+				'methods' => array(),
+				'chosen'  => '',
+				'total'   => '',
+			);
+		}
+
+		$zones = WC_Shipping_Zones::get_zones();
+		$zones[] = array(
+			'zone_id' => 0,
+		);
+
+		$methods = array();
+		foreach ( $zones as $zone_data ) {
+			$zone = new WC_Shipping_Zone( $zone_data['zone_id'] );
+			foreach ( $zone->get_shipping_methods( true ) as $method ) {
+				if ( ! $method || ! $method->enabled ) {
+					continue;
+				}
+				$instance_id = $method->get_instance_id();
+				$method_id = $method->get_method_id();
+				$rate_id = $method_id . ':' . $instance_id;
+				$cost = 0.0;
+				if ( isset( $method->cost ) && '' !== $method->cost ) {
+					$cost = (float) $method->cost;
+				} elseif ( isset( $method->settings['cost'] ) && '' !== $method->settings['cost'] ) {
+					$cost = (float) $method->settings['cost'];
+				}
+				$methods[ $rate_id ] = array(
+					'id'        => $rate_id,
+					'label'     => $method->get_title(),
+					'price'     => wc_price( $cost ),
+					'selected'  => false,
+					'method_id' => $method_id,
+					'cost_raw'  => $cost,
+				);
+			}
+		}
+
+		if ( empty( $methods ) ) {
+			return array(
+				'methods' => array(),
+				'chosen'  => '',
+				'total'   => '',
+			);
+		}
+
+		$chosen_id = '';
+		$max_cost = -1;
+		foreach ( $methods as $rate_id => $method ) {
+			if ( $method['cost_raw'] >= $max_cost ) {
+				$max_cost = $method['cost_raw'];
+				$chosen_id = $rate_id;
+			}
+		}
+
+		foreach ( $methods as $rate_id => &$method ) {
+			$method['selected'] = ( $rate_id === $chosen_id );
+			unset( $method['cost_raw'] );
+		}
+		unset( $method );
+
+		return array(
+			'methods'   => array_values( $methods ),
+			'chosen'    => $chosen_id,
+			'total'     => $chosen_id && isset( $methods[ $chosen_id ] ) ? $methods[ $chosen_id ]['price'] : '',
+			'total_raw' => $max_cost > 0 ? $max_cost : 0,
 		);
 	}
 
@@ -1983,6 +2284,20 @@ class Trizync_Pop_Cart_Public {
 			);
 		}
 
+		if ( empty( $payload ) ) {
+			$all_gateways = WC()->payment_gateways()->payment_gateways();
+			if ( isset( $all_gateways['cod'] ) && $all_gateways['cod'] && $all_gateways['cod']->enabled ) {
+				$gateway = $all_gateways['cod'];
+				$payload[] = array(
+					'id'          => 'cod',
+					'title'       => $gateway->get_title(),
+					'description' => wp_kses_post( $gateway->get_description() ),
+					'selected'    => true,
+				);
+				$chosen = 'cod';
+			}
+		}
+
 		if ( ( ! $chosen || 'cod' !== $chosen ) && ! empty( $payload ) ) {
 			$chosen = $payload[0]['id'];
 		}
@@ -2004,8 +2319,6 @@ class Trizync_Pop_Cart_Public {
 	 * @return string
 	 */
 	private function get_default_shipping_method_id( $rates ) {
-		$free = '';
-		$pickup = '';
 		$max_cost = -1;
 		$max_id = '';
 
@@ -2014,26 +2327,11 @@ class Trizync_Pop_Cart_Public {
 				continue;
 			}
 			$method_id = $rate->get_method_id();
-			if ( 'free_shipping' === $method_id ) {
-				$free = $rate_id;
-			}
-			if ( 'local_pickup' === $method_id ) {
-				$pickup = $rate_id;
-			}
-
 			$cost = (float) $rate->get_cost();
 			if ( $cost >= $max_cost ) {
 				$max_cost = $cost;
 				$max_id   = $rate_id;
 			}
-		}
-
-		if ( $free ) {
-			return $free;
-		}
-
-		if ( $pickup ) {
-			return $pickup;
 		}
 
 		return $max_id;

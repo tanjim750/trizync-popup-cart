@@ -48,7 +48,9 @@ define( 'TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON', 'trizync_pop_cart_product_butt
 define( 'TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL', 'trizync_pop_cart_product_button_label' );
 define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC', 'trizync_pop_cart_replace_atc' );
 define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL', 'trizync_pop_cart_replace_atc_label' );
+define( 'TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS', 'trizync_pop_cart_button_selectors' );
 
+define('ZYNCOPS_PLUGIN_URL', 'https://triizync.com/step/zyncops-2/');
 /**
  * The code that runs during plugin activation.
  * This action is documented in includes/class-trizync-pop-cart-activator.php

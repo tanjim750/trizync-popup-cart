@@ -100,6 +100,14 @@
 	color: #6b6b6b;
 }
 
+.trizync-pop-cart-fields__error {
+	display: block;
+	margin-top: 6px;
+	font-size: 12px;
+	color: #b42318;
+	font-weight: 600;
+}
+
 .trizync-pop-cart-fields__layout {
 	display: grid;
 	grid-template-columns: 1.6fr 1fr;
@@ -582,6 +590,11 @@
 .trizync-pop-cart-admin__card--scripts {
 	grid-column: 1 / -1;
 }
+
+.trizync-pop-cart-admin__card--selectors {
+	grid-column: 1 / -1;
+}
+
 
 .trizync-pop-cart-scripts {
 	display: flex;

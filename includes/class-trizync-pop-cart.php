@@ -174,6 +174,8 @@ class Trizync_Pop_Cart {
 		$plugin_public = new Trizync_Pop_Cart_Public( $this->get_plugin_name(), $this->get_version() );
 
 		$this->loader->add_action( 'init', $plugin_public, 'register_shortcodes' );
+		$this->loader->add_action( 'init', $plugin_public, 'maybe_enable_popcart_checkout_filters' );
+		$this->loader->add_action( 'init', $plugin_public, 'override_loop_product_link_open', 20 );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_cart', $plugin_public, 'ajax_get_cart' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_cart', $plugin_public, 'ajax_get_cart' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_product_preview', $plugin_public, 'ajax_get_product_preview' );

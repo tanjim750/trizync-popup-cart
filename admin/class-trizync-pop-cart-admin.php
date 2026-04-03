@@ -209,6 +209,15 @@ class Trizync_Pop_Cart_Admin {
 				'default'           => __( 'Checkout', 'trizync-pop-cart' ),
 			)
 		);
+		register_setting(
+			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_textarea_field',
+				'default'           => '',
+			)
+		);
 
 		register_setting(
 			'trizync_pop_cart_settings',
@@ -292,12 +301,27 @@ class Trizync_Pop_Cart_Admin {
 			'trizync-pop-cart'
 		);
 
+		add_settings_section(
+			'trizync_pop_cart_selectors',
+			__( 'Button Selectors', 'trizync-pop-cart' ),
+			'__return_false',
+			'trizync-pop-cart'
+		);
+
 		add_settings_field(
 			'trizync_pop_cart_scripts_manager',
 			'',
 			array( $this, 'render_scripts_manager' ),
 			'trizync-pop-cart',
 			'trizync_pop_cart_scripts'
+		);
+
+		add_settings_field(
+			'trizync_pop_cart_selectors_manager',
+			'',
+			array( $this, 'render_selectors_manager' ),
+			'trizync-pop-cart',
+			'trizync_pop_cart_selectors'
 		);
 	}
 
@@ -374,7 +398,7 @@ class Trizync_Pop_Cart_Admin {
 				</p>
 				<div class="trizync-pop-cart-admin__marketing-cta">
 					<span><?php esc_html_e( 'যোগাযোগ: 01873316706', 'trizync-pop-cart' ); ?></span>
-					<a href="<?php echo esc_url( 'https://zyncops.triizync.com/' ); ?>" target="_blank" rel="noopener noreferrer">
+					<a href="<?php echo esc_url( ZYNCOPS_PLUGIN_URL ); ?>" target="_blank" rel="noopener noreferrer">
 						<?php esc_html_e( 'ZyncOps ভিজিট করুন', 'trizync-pop-cart' ); ?>
 					</a>
 				</div>
@@ -425,6 +449,11 @@ class Trizync_Pop_Cart_Admin {
 					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--fields">
 						<?php
 						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_fields' );
+						?>
+					</div>
+					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--selectors">
+						<?php
+						do_settings_fields( 'trizync-pop-cart', 'trizync_pop_cart_selectors' );
 						?>
 					</div>
 					<div class="trizync-pop-cart-admin__card trizync-pop-cart-admin__card--scripts">
@@ -527,6 +556,28 @@ class Trizync_Pop_Cart_Admin {
 					<button type="button" class="trizync-pop-cart-branding__preview-cta"><?php echo esc_html( $cta_label ); ?></button>
 				</div>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render selectors manager UI.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_selectors_manager() {
+		?>
+		<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'Button Selectors', 'trizync-pop-cart' ); ?></h2>
+		<p class="trizync-pop-cart-fields__subtitle"><?php esc_html_e( 'Add custom CSS selectors for buttons that should open Pop Cart.', 'trizync-pop-cart' ); ?></p>
+		<div class="trizync-pop-cart-branding__cta">
+			<label class="trizync-pop-cart-fields__label"><?php esc_html_e( 'Custom button selectors', 'trizync-pop-cart' ); ?></label>
+			<textarea class="trizync-pop-cart-fields__textarea" rows="4" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS ); ?>" placeholder="<?php echo esc_attr__( '.buy-now-button, .order-now, .custom-checkout', 'trizync-pop-cart' ); ?>" data-popcart-selector-input><?php echo esc_textarea( get_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS, '' ) ); ?></textarea>
+			<p class="trizync-pop-cart-fields__hint"><?php esc_html_e( 'Comma-separated CSS selectors. These will trigger Pop Cart when clicked.', 'trizync-pop-cart' ); ?></p>
+			<p class="trizync-pop-cart-fields__hint"><?php esc_html_e( 'Examples: class selectors (.buy-now-button), id selectors (#buy-now), attribute selectors ([data-buy-now]).', 'trizync-pop-cart' ); ?></p>
+			<p class="trizync-pop-cart-fields__error" data-popcart-selector-error hidden></p>
+		</div>
+		<div class="trizync-pop-cart-scripts__actions">
+			<?php submit_button( __( 'Save Settings', 'trizync-pop-cart' ), 'primary trizync-pop-cart-admin__pill', 'submit', false ); ?>
 		</div>
 		<?php
 	}

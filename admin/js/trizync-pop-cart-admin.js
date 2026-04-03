@@ -108,6 +108,29 @@
 		);
 	}
 
+	function parseSelectorList( raw ) {
+		if ( ! raw ) {
+			return [];
+		}
+		return raw
+			.split( /,|\n/ )
+			.map( function( item ) { return item.trim(); } )
+			.filter( function( item ) { return item.length > 0; } );
+	}
+
+	function validateSelectors( raw ) {
+		var selectors = parseSelectorList( raw );
+		var invalid = [];
+		selectors.forEach( function( selector ) {
+			try {
+				document.querySelector( selector );
+			} catch ( e ) {
+				invalid.push( selector );
+			}
+		} );
+		return invalid;
+	}
+
 	function renderAll( $manager, defaults ) {
 		var $editor = $manager.find( '[data-fields-editor]' );
 		var $preview = $manager.find( '[data-fields-preview]' );
@@ -293,6 +316,52 @@
 
 			renderAll( $manager, defaults );
 		} );
+	} );
+
+	$( function() {
+		var $selectorInput = $( '[data-popcart-selector-input]' );
+		var $selectorError = $( '[data-popcart-selector-error]' );
+
+		function showSelectorError( message ) {
+			if ( ! $selectorError.length ) {
+				return;
+			}
+			if ( message ) {
+				$selectorError.text( message ).prop( 'hidden', false );
+			} else {
+				$selectorError.text( '' ).prop( 'hidden', true );
+			}
+		}
+
+		function runSelectorValidation() {
+			if ( ! $selectorInput.length ) {
+				return true;
+			}
+			var raw = $selectorInput.val() || '';
+			var invalid = validateSelectors( raw );
+			if ( invalid.length ) {
+				showSelectorError( 'Invalid selector(s): ' + invalid.join( ', ' ) );
+				return false;
+			}
+			showSelectorError( '' );
+			return true;
+		}
+
+		if ( $selectorInput.length ) {
+			$selectorInput.on( 'input', function() {
+				runSelectorValidation();
+			} );
+		}
+
+		var $form = $( '.trizync-pop-cart-admin__form' );
+		if ( $form.length ) {
+			$form.on( 'submit', function( event ) {
+				if ( ! runSelectorValidation() ) {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+				}
+			} );
+		}
 	} );
 
 	$( function() {

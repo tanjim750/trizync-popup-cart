@@ -51,6 +51,9 @@ class Trizync_Pop_Cart_Activator {
 		if ( false === get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL ) ) {
 			add_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL, 'Checkout' );
 		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS, '' );
+		}
 	}
 
 }
