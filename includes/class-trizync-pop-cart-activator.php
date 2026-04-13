@@ -54,6 +54,9 @@ class Trizync_Pop_Cart_Activator {
 		if ( false === get_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS ) ) {
 			add_option( TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS, '' );
 		}
+		if ( false === get_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE ) ) {
+			add_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE, 'classic' );
+		}
 	}
 
 }

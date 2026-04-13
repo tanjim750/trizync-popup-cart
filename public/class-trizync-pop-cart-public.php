@@ -111,16 +111,27 @@ class Trizync_Pop_Cart_Public {
 			return;
 		}
 
-		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/trizync-pop-cart-public.js', array( 'jquery' ), $this->version, true );
+		$flow_mode = $this->get_flow_mode();
+		$script_handle = $this->plugin_name;
+		$script_src = 'js/trizync-pop-cart-public.js';
+		if ( 'light' === $flow_mode ) {
+			$script_handle = $this->plugin_name . '-light';
+			$script_src = 'js/trizync-pop-cart-light.js';
+		}
+
+		wp_enqueue_script( $script_handle, plugin_dir_url( __FILE__ ) . $script_src, array( 'jquery' ), $this->version, true );
 		wp_localize_script(
-			$this->plugin_name,
+			$script_handle,
 			'TrizyncPopCart',
 			array(
 				'enabled'  => 1,
 				'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'trizync_pop_cart_nonce' ),
+				'nonce'    => wp_create_nonce( Trizync_Pop_Cart_Nonces::CLASSIC ),
+				'nonce_preview'  => wp_create_nonce( Trizync_Pop_Cart_Nonces::PREVIEW ),
+				'nonce_checkout' => wp_create_nonce( Trizync_Pop_Cart_Nonces::CHECKOUT ),
 				'cartHash' => function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart_hash() : '',
 				'currency' => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
+				'flowMode' => $flow_mode,
 				'scripts'  => $this->get_scripts_settings(),
 				'scriptsEnabled' => (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 ),
 				'replaceAddToCart' => $this->is_replace_add_to_cart_enabled(),
@@ -137,6 +148,35 @@ class Trizync_Pop_Cart_Public {
 			)
 		);
 
+	}
+
+	/**
+	 * Get flow mode.
+	 *
+	 * @since 1.0.0
+	 * @return string
+	 */
+	public function get_flow_mode() {
+		if( defined('TRIZYNC_POP_CART_FLOW_MODE_DEFAULT') && TRIZYNC_POP_CART_FLOW_MODE_DEFAULT ) {
+			return TRIZYNC_POP_CART_FLOW_MODE_DEFAULT;
+		}
+		
+		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_FLOW_MODE' ) ) {
+			return 'classic';
+		}
+		$mode = get_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE, 'classic' );
+		$mode = is_string( $mode ) ? strtolower( trim( $mode ) ) : 'classic';
+		return in_array( $mode, array( 'classic', 'light' ), true ) ? $mode : 'classic';
+	}
+
+	/**
+	 * Check if classic flow is enabled.
+	 *
+	 * @since 1.0.0
+	 * @return bool
+	 */
+	public function is_classic_flow() {
+		return 'classic' === $this->get_flow_mode();
 	}
 
 	/**
@@ -446,7 +486,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since    1.0.0
 	 * @return bool
 	 */
-	private function is_enabled() {
+	protected function is_enabled() {
 		return (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_ENABLED, 1 );
 	}
 
@@ -456,7 +496,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return bool
 	 */
-	private function is_product_button_enabled() {
+	protected function is_product_button_enabled() {
 		return (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON, 0 );
 	}
 
@@ -466,7 +506,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return bool
 	 */
-	private function is_replace_add_to_cart_enabled() {
+	protected function is_replace_add_to_cart_enabled() {
 		return (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC, 0 );
 	}
 
@@ -476,7 +516,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function get_replace_add_to_cart_label() {
+	protected function get_replace_add_to_cart_label() {
 		$label = get_option( TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL, __( 'Checkout', 'trizync-pop-cart' ) );
 		return $label ? $label : __( 'Checkout', 'trizync-pop-cart' );
 	}
@@ -487,7 +527,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function get_product_button_label() {
+	protected function get_product_button_label() {
 		$label = get_option( TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL, __( 'Checkout', 'trizync-pop-cart' ) );
 		return $label ? $label : __( 'Checkout', 'trizync-pop-cart' );
 	}
@@ -498,7 +538,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function get_branding_settings() {
+	protected function get_branding_settings() {
 		$defaults = array(
 			'primary'   => '#411264',
 			'secondary' => '#f0a60a',
@@ -524,7 +564,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function get_script_hooks() {
+	protected function get_script_hooks() {
 		return array(
 			'popcart:boot',
 			'popcart:open:start',
@@ -557,7 +597,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function get_scripts_settings() {
+	protected function get_scripts_settings() {
 		$defaults = array();
 		foreach ( $this->get_script_hooks() as $hook ) {
 			$defaults[ $hook ] = '';
@@ -583,7 +623,7 @@ class Trizync_Pop_Cart_Public {
 	 * @param string $hex
 	 * @return string
 	 */
-	private function hex_to_rgb( $hex ) {
+	protected function hex_to_rgb( $hex ) {
 		$hex = ltrim( $hex, '#' );
 		if ( strlen( $hex ) === 3 ) {
 			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
@@ -603,7 +643,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function get_cta_label() {
+	protected function get_cta_label() {
 		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_CTA_LABEL' ) ) {
 			return __( 'Proceed to checkout', 'trizync-pop-cart' );
 		}
@@ -618,7 +658,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function get_header_eyebrow() {
+	protected function get_header_eyebrow() {
 		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_HEADER_EYEBROW' ) ) {
 			return __( 'Instant checkout', 'trizync-pop-cart' );
 		}
@@ -633,7 +673,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function get_header_title() {
+	protected function get_header_title() {
 		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_HEADER_TITLE' ) ) {
 			return __( 'Secure checkout', 'trizync-pop-cart' );
 		}
@@ -647,7 +687,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function render_checkout_form() {
+	protected function render_checkout_form() {
 		if ( ! function_exists( 'WC' ) ) {
 			return;
 		}
@@ -725,7 +765,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function get_enabled_fields_config() {
+	protected function get_enabled_fields_config() {
 		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_FIELDS' ) ) {
 			return array();
 		}
@@ -1028,7 +1068,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function get_default_field_keys() {
+	protected function get_default_field_keys() {
 		return array(
 			'billing_first_name',
 			'billing_phone',
@@ -1079,7 +1119,7 @@ class Trizync_Pop_Cart_Public {
 	 * @param int $product_id Product ID.
 	 * @return int
 	 */
-	private function get_cart_quantity_for_product( $product_id ) {
+	protected function get_cart_quantity_for_product( $product_id ) {
 		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
 			return 1;
 		}
@@ -1099,120 +1139,12 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
-	 * AJAX: Get cart data.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_get_cart() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$ping = ! empty( $_POST['ping'] );
-		if ( $ping ) {
-			$this->warm_session_only();
-			wp_send_json_success(
-				array(
-					'items'     => array(),
-					'shipping'  => array(),
-					'payment'   => array(),
-					'coupons'   => array(),
-					'notices'   => '',
-					'subtotal'  => '',
-					'subtotal_raw' => 0,
-					'total'     => '',
-					'total_raw' => 0,
-					'hash'      => '',
-					'itemCount' => 0,
-				)
-			);
-		}
-
-		try {
-			$this->ensure_cart_loaded();
-			$this->trigger_checkout_open_hooks();
-			$this->trigger_backend_checkout_hooks( 'get_cart' );
-			wp_send_json_success( $this->build_cart_payload() );
-		} catch ( Throwable $e ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 500 );
-		}
-	}
-
-	/**
-	 * AJAX: Get single product preview totals/shipping.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_get_product_preview() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		try {
-			$this->ensure_cart_loaded();
-
-			$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
-			$quantity   = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
-			$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
-			$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
-			$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
-			$replace_cart_only = ! empty( $_POST['replace_cart_only'] );
-			$attributes = array();
-			if ( $attributes_raw ) {
-				$decoded = json_decode( $attributes_raw, true );
-				if ( is_array( $decoded ) ) {
-					$attributes = $decoded;
-				}
-			}
-
-			if ( ! $product_id ) {
-				wp_send_json_error( array( 'message' => 'missing_product' ), 400 );
-			}
-
-			$this->trigger_backend_checkout_hooks( 'get_product_preview' );
-			wp_send_json_success( $this->build_product_preview_payload( $product_id, $quantity, $variation_id, $attributes ) );
-		} catch ( Throwable $e ) {
-			$this->warm_session_only();
-			wp_send_json_error( array( 'message' => 'preview_unavailable' ), 500 );
-		}
-	}
-
-	/**
-	 * AJAX: Get WooCommerce notices for popup.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_get_notices() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		ob_start();
-		if ( function_exists( 'wc_print_notices' ) ) {
-			wc_print_notices();
-		}
-		$notices = ob_get_clean();
-
-		wp_send_json_success(
-			array(
-				'notices' => $notices,
-			)
-		);
-	}
-
-	/**
 	 * Build notices HTML.
 	 *
 	 * @since 1.0.0
 	 * @return string
 	 */
-	private function build_notices() {
+	protected function build_notices() {
 		ob_start();
 		if ( function_exists( 'wc_print_notices' ) ) {
 			wc_print_notices();
@@ -1221,352 +1153,12 @@ class Trizync_Pop_Cart_Public {
 	}
 
 	/**
-	 * AJAX: Get checkout form HTML for popup.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_get_checkout_form() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		ob_start();
-		$this->render_checkout_form();
-		$form_html = ob_get_clean();
-
-		wp_send_json_success(
-			array(
-				'form' => $form_html,
-			)
-		);
-	}
-
-	/**
-	 * AJAX: Apply coupon code.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_apply_coupon() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$code = isset( $_POST['code'] ) ? wc_clean( wp_unslash( $_POST['code'] ) ) : '';
-		if ( ! $code ) {
-			wp_send_json_error( array( 'message' => __( 'Please enter a coupon code.', 'trizync-pop-cart' ) ), 400 );
-		}
-
-		if ( ! WC()->cart ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		$applied = WC()->cart->apply_coupon( $code );
-		WC()->cart->calculate_totals();
-
-		if ( ! $applied ) {
-			$message = __( 'Coupon could not be applied.', 'trizync-pop-cart' );
-			if ( function_exists( 'wc_get_notices' ) ) {
-				$notices = wc_get_notices( 'error' );
-				if ( ! empty( $notices ) && isset( $notices[0]['notice'] ) ) {
-					$message = wp_strip_all_tags( $notices[0]['notice'] );
-				}
-			}
-			wp_send_json_error( array( 'message' => $message ), 400 );
-		}
-
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Remove coupon code.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_remove_coupon() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$code = isset( $_POST['code'] ) ? wc_clean( wp_unslash( $_POST['code'] ) ) : '';
-		if ( ! $code || ! WC()->cart ) {
-			wp_send_json_error( array( 'message' => 'missing_coupon' ), 400 );
-		}
-
-		WC()->cart->remove_coupon( $code );
-		WC()->cart->calculate_totals();
-
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Update customer address data.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_update_customer() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		if ( ! function_exists( 'WC' ) || ! WC()->customer ) {
-			wp_send_json_error( array( 'message' => 'customer_unavailable' ), 400 );
-		}
-
-		$data = isset( $_POST['data'] ) ? wp_unslash( $_POST['data'] ) : array();
-		if ( ! is_array( $data ) ) {
-			$data = array();
-		}
-
-		$customer = WC()->customer;
-		foreach ( $data as $key => $value ) {
-			$clean_key = sanitize_key( $key );
-			if ( strpos( $clean_key, 'billing_' ) !== 0 && strpos( $clean_key, 'shipping_' ) !== 0 ) {
-				continue;
-			}
-			if ( '' === $value || null === $value ) {
-				continue;
-			}
-			$setter = 'set_' . $clean_key;
-			if ( is_callable( array( $customer, $setter ) ) ) {
-				$customer->$setter( wc_clean( $value ) );
-			}
-		}
-
-		$customer->save();
-		if ( WC()->session ) {
-			WC()->session->set_customer_session_cookie( true );
-		}
-		if ( WC()->cart ) {
-			WC()->cart->calculate_totals();
-		}
-
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Update cart item quantity.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_update_cart_item() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$key      = isset( $_POST['cart_item_key'] ) ? wc_clean( wp_unslash( $_POST['cart_item_key'] ) ) : '';
-		$quantity = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 0;
-
-		if ( ! $key ) {
-			wp_send_json_error( array( 'message' => 'missing_key' ), 400 );
-		}
-
-		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		if ( $quantity < 1 ) {
-			WC()->cart->remove_cart_item( $key );
-		} else {
-			WC()->cart->set_quantity( $key, $quantity, true );
-		}
-
-		$this->trigger_backend_checkout_hooks( 'update_cart_item' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Remove cart item.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_remove_cart_item() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$key = isset( $_POST['cart_item_key'] ) ? wc_clean( wp_unslash( $_POST['cart_item_key'] ) ) : '';
-
-		if ( ! $key ) {
-			wp_send_json_error( array( 'message' => 'missing_key' ), 400 );
-		}
-
-		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		WC()->cart->remove_cart_item( $key );
-
-		$this->trigger_backend_checkout_hooks( 'remove_cart_item' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Set shipping method.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_set_shipping_method() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$method = isset( $_POST['shipping_method'] ) ? wc_clean( wp_unslash( $_POST['shipping_method'] ) ) : '';
-
-		if ( ! $method ) {
-			wp_send_json_error( array( 'message' => 'missing_method' ), 400 );
-		}
-
-		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		WC()->session->set( 'chosen_shipping_methods', array( $method ) );
-		WC()->cart->calculate_totals();
-
-		$this->trigger_backend_checkout_hooks( 'set_shipping_method' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Set payment method.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_set_payment_method() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$method = isset( $_POST['payment_method'] ) ? wc_clean( wp_unslash( $_POST['payment_method'] ) ) : '';
-
-		if ( ! $method ) {
-			wp_send_json_error( array( 'message' => 'missing_method' ), 400 );
-		}
-
-		if ( ! function_exists( 'WC' ) || ! WC()->session ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		WC()->session->set( 'chosen_payment_method', $method );
-
-		$this->trigger_backend_checkout_hooks( 'set_payment_method' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Prepare single product checkout (replace cart).
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_prepare_product_checkout() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
-		$quantity   = isset( $_POST['quantity'] ) ? absint( $_POST['quantity'] ) : 1;
-		$variation_id = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : 0;
-		$attributes_raw = isset( $_POST['attributes'] ) ? wp_unslash( $_POST['attributes'] ) : '';
-		$attributes = array();
-		if ( $attributes_raw ) {
-			$decoded = json_decode( $attributes_raw, true );
-			if ( is_array( $decoded ) ) {
-				$attributes = $decoded;
-			}
-		}
-		
-		if ( ! $product_id ) {
-			wp_send_json_error( array( 'message' => 'missing_product' ), 400 );
-		}
-
-		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
-			wp_send_json_error( array( 'message' => 'cart_unavailable' ), 400 );
-		}
-
-		$product = wc_get_product( $product_id );
-		if ( $product instanceof WC_Product_Variable && ! $variation_id ) {
-			wp_send_json_error( array( 'message' => 'missing_variation' ), 400 );
-		}
-
-		if ( $replace_cart_only && WC()->session ) {
-			WC()->session->__unset( 'trizync_pop_cart_product_checkout' );
-			WC()->session->__unset( 'trizync_pop_cart_snapshot' );
-		} else {
-			$this->snapshot_cart();
-		}
-		WC()->cart->empty_cart( true );
-		WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
-		WC()->cart->calculate_totals();
-
-		if ( ! $replace_cart_only && WC()->session ) {
-			WC()->session->set( 'trizync_pop_cart_product_checkout', 1 );
-		}
-
-		$this->trigger_backend_checkout_hooks( 'prepare_product_checkout' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
-	 * AJAX: Restore cart after single product checkout flow.
-	 *
-	 * @since 1.0.0
-	 */
-	public function ajax_restore_cart() {
-		if ( ! $this->is_enabled() ) {
-			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-		}
-
-		check_ajax_referer( 'trizync_pop_cart_nonce', 'nonce' );
-
-		$this->ensure_cart_loaded();
-
-		$this->restore_cart_snapshot();
-
-		$this->trigger_backend_checkout_hooks( 'restore_cart' );
-		wp_send_json_success( $this->build_cart_payload() );
-	}
-
-	/**
 	 * Build cart payload for AJAX responses.
 	 *
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function build_cart_payload() {
+	protected function build_cart_payload() {
 		$this->ensure_cart_loaded();
 
 		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
@@ -1647,7 +1239,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function snapshot_cart() {
+	protected function snapshot_cart() {
 		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
 			return;
 		}
@@ -1679,7 +1271,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function restore_cart_snapshot() {
+	protected function restore_cart_snapshot() {
 		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
 			return;
 		}
@@ -1720,7 +1312,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @param string $context
 	 */
-	private function trigger_backend_checkout_hooks( $context ) {
+	protected function trigger_backend_checkout_hooks( $context ) {
 		if ( ! function_exists( 'do_action' ) ) {
 			return;
 		}
@@ -1747,7 +1339,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function trigger_checkout_open_hooks() {
+	protected function trigger_checkout_open_hooks() {
 		if ( ! function_exists( 'WC' ) ) {
 			return;
 		}
@@ -1778,7 +1370,7 @@ class Trizync_Pop_Cart_Public {
 	 * @param int $quantity
 	 * @return array
 	 */
-	private function build_product_preview_payload( $product_id, $quantity, $variation_id = 0, $attributes = array() ) {
+	protected function build_product_preview_payload( $product_id, $quantity, $variation_id = 0, $attributes = array() ) {
 		$this->ensure_cart_loaded();
 
 		if ( ! function_exists( 'wc_get_product' ) ) {
@@ -1960,7 +1552,7 @@ class Trizync_Pop_Cart_Public {
 	 * @param int        $quantity
 	 * @return array
 	 */
-	private function build_shipping_payload_for_product( $product, $quantity ) {
+	protected function build_shipping_payload_for_product( $product, $quantity ) {
 		$this->ensure_cart_loaded();
 
 		if ( ! function_exists( 'WC' ) || ! WC()->shipping() ) {
@@ -2090,7 +1682,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function build_shipping_payload() {
+	protected function build_shipping_payload() {
 		$this->ensure_cart_loaded();
 
 		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->shipping() ) {
@@ -2184,7 +1776,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function build_shipping_methods_fallback() {
+	protected function build_shipping_methods_fallback() {
 		if ( ! function_exists( 'WC' ) || ! WC()->shipping() ) {
 			return array(
 				'methods' => array(),
@@ -2262,7 +1854,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function build_coupon_payload() {
+	protected function build_coupon_payload() {
 		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
 			return array();
 		}
@@ -2285,7 +1877,7 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	private function build_payment_payload() {
+	protected function build_payment_payload() {
 		if ( ! function_exists( 'WC' ) || ! WC()->payment_gateways() ) {
 			return array(
 				'gateways' => array(),
@@ -2346,7 +1938,7 @@ class Trizync_Pop_Cart_Public {
 	 * @param array $rates
 	 * @return string
 	 */
-	private function get_default_shipping_method_id( $rates ) {
+	protected function get_default_shipping_method_id( $rates ) {
 		$max_cost = -1;
 		$max_id = '';
 
@@ -2370,7 +1962,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function ensure_cart_loaded() {
+	protected function ensure_cart_loaded() {
 		if ( ! function_exists( 'WC' ) ) {
 			return;
 		}
@@ -2400,7 +1992,7 @@ class Trizync_Pop_Cart_Public {
 	 *
 	 * @since 1.0.0
 	 */
-	private function warm_session_only() {
+	protected function warm_session_only() {
 		if ( ! function_exists( 'WC' ) ) {
 			return;
 		}

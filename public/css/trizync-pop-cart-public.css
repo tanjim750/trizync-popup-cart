@@ -579,6 +579,13 @@
 	opacity: 1;
 }
 
+.trizync-pop-cart__cta.is-disabled,
+.trizync-pop-cart__cta:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+	box-shadow: none;
+}
+
 #trizync-pop-cart .trizync-pop-cart__cta {
 	display: block !important;
 	width: 100% !important;

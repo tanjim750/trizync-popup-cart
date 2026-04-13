@@ -49,6 +49,9 @@ define( 'TRIZYNC_POP_CART_OPTION_PRODUCT_BUTTON_LABEL', 'trizync_pop_cart_produc
 define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC', 'trizync_pop_cart_replace_atc' );
 define( 'TRIZYNC_POP_CART_OPTION_REPLACE_ATC_LABEL', 'trizync_pop_cart_replace_atc_label' );
 define( 'TRIZYNC_POP_CART_OPTION_BUTTON_SELECTORS', 'trizync_pop_cart_button_selectors' );
+define( 'TRIZYNC_POP_CART_OPTION_FLOW_MODE', 'trizync_pop_cart_flow_mode' );
+define( 'TRIZYNC_POP_CART_FLOW_MODE_DEFAULT', 'light' );
+define( 'TRIZYNC_POP_CART_SHOW_FLOW_MODE', true );
 
 define('ZYNCOPS_PLUGIN_URL', 'https://triizync.com/step/zyncops-2/');
 /**
@@ -76,6 +79,7 @@ register_deactivation_hook( __FILE__, 'deactivate_trizync_pop_cart' );
  * The core plugin class that is used to define internationalization,
  * admin-specific hooks, and public-facing site hooks.
  */
+require plugin_dir_path( __FILE__ ) . 'includes/class-trizync-pop-cart-nonces.php';
 require plugin_dir_path( __FILE__ ) . 'includes/class-trizync-pop-cart.php';
 
 /**

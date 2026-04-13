@@ -231,6 +231,16 @@ class Trizync_Pop_Cart_Admin {
 
 		register_setting(
 			'trizync_pop_cart_settings',
+			TRIZYNC_POP_CART_OPTION_FLOW_MODE,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_flow_mode' ),
+				'default'           => 'classic',
+			)
+		);
+
+		register_setting(
+			'trizync_pop_cart_settings',
 			TRIZYNC_POP_CART_OPTION_SCRIPTS,
 			array(
 				'type'              => 'string',
@@ -263,6 +273,16 @@ class Trizync_Pop_Cart_Admin {
 			'trizync-pop-cart',
 			'trizync_pop_cart_main'
 		);
+
+		if ( defined( 'TRIZYNC_POP_CART_SHOW_FLOW_MODE' ) && TRIZYNC_POP_CART_SHOW_FLOW_MODE ) {
+			add_settings_field(
+				'trizync_pop_cart_flow_mode',
+				__( 'Checkout Flow', 'trizync-pop-cart' ),
+				array( $this, 'render_flow_mode_field' ),
+				'trizync-pop-cart',
+				'trizync_pop_cart_main'
+			);
+		}
 
 		add_settings_section(
 			'trizync_pop_cart_fields',
@@ -356,6 +376,36 @@ class Trizync_Pop_Cart_Admin {
 	}
 
 	/**
+	 * Render the flow mode selector.
+	 *
+	 * @since    1.0.0
+	 */
+	public function render_flow_mode_field() {
+		$value = get_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE, 'classic' );
+		?>
+		<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-flow-mode">
+			<?php esc_html_e( 'Select checkout flow', 'trizync-pop-cart' ); ?>
+		</label>
+		<select id="trizync-pop-cart-flow-mode" class="trizync-pop-cart-fields__select" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_FLOW_MODE ); ?>">
+			<option value="classic" <?php selected( 'classic', $value ); ?>><?php esc_html_e( 'Classic (Cart-based)', 'trizync-pop-cart' ); ?></option>
+			<option value="light" <?php selected( 'light', $value ); ?>><?php esc_html_e( 'Light (Product preview)', 'trizync-pop-cart' ); ?></option>
+		</select>
+		<?php
+	}
+
+	/**
+	 * Sanitize flow mode.
+	 *
+	 * @since    1.0.0
+	 * @param string $value
+	 * @return string
+	 */
+	public function sanitize_flow_mode( $value ) {
+		$value = is_string( $value ) ? strtolower( trim( $value ) ) : 'classic';
+		return in_array( $value, array( 'classic', 'light' ), true ) ? $value : 'classic';
+	}
+
+	/**
 	 * Render the settings page.
 	 *
 	 * @since    1.0.0
@@ -406,6 +456,17 @@ class Trizync_Pop_Cart_Admin {
 				<div class="trizync-pop-cart-admin__grid">
 					<div class="trizync-pop-cart-admin__card">
 						<h2 class="trizync-pop-cart-admin__card-title"><?php esc_html_e( 'General', 'trizync-pop-cart' ); ?></h2>
+						<?php if ( defined( 'TRIZYNC_POP_CART_SHOW_FLOW_MODE' ) && TRIZYNC_POP_CART_SHOW_FLOW_MODE ) : ?>
+							<div class="trizync-pop-cart-branding__cta">
+								<label class="trizync-pop-cart-fields__label" for="trizync-pop-cart-flow-mode">
+									<?php esc_html_e( 'Checkout flow', 'trizync-pop-cart' ); ?>
+								</label>
+								<select id="trizync-pop-cart-flow-mode" class="trizync-pop-cart-fields__select" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_FLOW_MODE ); ?>">
+									<option value="classic" <?php selected( 'classic', get_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE, 'classic' ) ); ?>><?php esc_html_e( 'Classic (Cart-based)', 'trizync-pop-cart' ); ?></option>
+									<option value="light" <?php selected( 'light', get_option( TRIZYNC_POP_CART_OPTION_FLOW_MODE, 'classic' ) ); ?>><?php esc_html_e( 'Light (Product preview)', 'trizync-pop-cart' ); ?></option>
+								</select>
+							</div>
+						<?php endif; ?>
 						<div class="trizync-pop-cart-branding__cta">
 							<label class="trizync-pop-cart-fields__toggle-inline">
 								<span class="trizync-pop-cart-fields__toggle-label"><?php esc_html_e( 'Replace Add to Cart buttons', 'trizync-pop-cart' ); ?></span>
