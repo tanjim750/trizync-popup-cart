@@ -1784,6 +1784,15 @@ class Trizync_Pop_Cart_Public {
 				'total'   => '',
 			);
 		}
+		if ( ! class_exists( 'WC_Shipping_Zones' ) || ! class_exists( 'WC_Shipping_Zone' ) ) {
+			return array(
+				'methods' => array(),
+				'chosen'  => '',
+				'total'   => '',
+			);
+		}
+
+		WC()->shipping()->init();
 
 		$zones = WC_Shipping_Zones::get_zones();
 		$zones[] = array(
