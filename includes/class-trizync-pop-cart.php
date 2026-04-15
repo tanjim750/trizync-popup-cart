@@ -180,11 +180,12 @@ class Trizync_Pop_Cart {
 
 		$this->loader->add_action( 'init', $plugin_public, 'register_shortcodes' );
 		$this->loader->add_action( 'init', $plugin_public, 'maybe_enable_popcart_checkout_filters' );
+		$this->loader->add_action( 'init', $plugin_public, 'enable_checkout_button_overrides' );
 		$this->loader->add_action( 'init', $plugin_public, 'override_loop_product_link_open', 20 );
 		$is_classic_flow = method_exists( $plugin_public, 'is_classic_flow' ) ? $plugin_public->is_classic_flow() : true;
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_cart', $plugin_ajax, 'ajax_get_cart' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_cart', $plugin_ajax, 'ajax_get_cart' );
 		if ( $is_classic_flow ) {
-			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_cart', $plugin_ajax, 'ajax_get_cart' );
-			$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_cart', $plugin_ajax, 'ajax_get_cart' );
 			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_product_preview', $plugin_ajax, 'ajax_get_product_preview' );
 			$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_product_preview', $plugin_ajax, 'ajax_get_product_preview' );
 			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_update_cart_item', $plugin_ajax, 'ajax_update_cart_item' );
@@ -222,6 +223,8 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_customer', $plugin_ajax, 'ajax_get_customer' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_shipping_methods_light', $plugin_ajax, 'ajax_get_shipping_methods_light' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_shipping_methods_light', $plugin_ajax, 'ajax_get_shipping_methods_light' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_shipping_methods_applied_light', $plugin_ajax, 'ajax_get_shipping_methods_applied_light' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_shipping_methods_applied_light', $plugin_ajax, 'ajax_get_shipping_methods_applied_light' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_calc_subtotal_light', $plugin_ajax, 'ajax_calc_subtotal_light' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_calc_subtotal_light', $plugin_ajax, 'ajax_calc_subtotal_light' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_preview_coupon_light', $plugin_ajax, 'ajax_preview_coupon_light' );
@@ -232,6 +235,10 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_light_warm', $plugin_ajax, 'ajax_light_warm' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_light_prepare_checkout', $plugin_ajax, 'ajax_light_prepare_checkout' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_light_prepare_checkout', $plugin_ajax, 'ajax_light_prepare_checkout' );
+		// $this->loader->add_action( 'wp_ajax_trizync_pop_cart_create_order', $plugin_ajax, 'ajax_create_order' );
+		// $this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_create_order', $plugin_ajax, 'ajax_create_order' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_create_order', $plugin_ajax, 'ajax_create_order_test' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_create_order', $plugin_ajax, 'ajax_create_order_test' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_apply_coupon', $plugin_ajax, 'ajax_apply_coupon' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_apply_coupon', $plugin_ajax, 'ajax_apply_coupon' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_remove_coupon', $plugin_ajax, 'ajax_remove_coupon' );

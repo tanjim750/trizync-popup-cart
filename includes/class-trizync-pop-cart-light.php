@@ -198,6 +198,127 @@ class Trizync_Pop_Cart_Light extends Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * Build a light preview payload using cart-calculated totals/shipping for consistency.
+	 *
+	 * @param int   $product_id
+	 * @param int   $quantity
+	 * @param int   $variation_id
+	 * @param array $attributes
+	 * @param array $coupon_codes
+	 * @return array
+	 */
+	public function build_light_preview_payload_consistent( $product_id, $quantity = 1, $variation_id = 0, $attributes = array(), $coupon_codes = array() ) {
+		if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->session ) {
+			return $this->build_light_preview_payload( $product_id, $quantity, $variation_id, $attributes, $coupon_codes );
+		}
+
+		$quantity = max( 1, (int) $quantity );
+		$attributes = is_array( $attributes ) ? $attributes : array();
+
+		$original_items = array();
+		foreach ( WC()->cart->get_cart() as $cart_item ) {
+			if ( empty( $cart_item['product_id'] ) ) {
+				continue;
+			}
+			$original_items[] = array(
+				'product_id'     => (int) $cart_item['product_id'],
+				'variation_id'   => isset( $cart_item['variation_id'] ) ? (int) $cart_item['variation_id'] : 0,
+				'variation'      => isset( $cart_item['variation'] ) ? $cart_item['variation'] : array(),
+				'quantity'       => isset( $cart_item['quantity'] ) ? (int) $cart_item['quantity'] : 1,
+				'cart_item_data' => isset( $cart_item['cart_item_data'] ) ? $cart_item['cart_item_data'] : array(),
+			);
+		}
+
+		$original_coupons = WC()->cart->get_applied_coupons();
+		$original_shipping = WC()->session->get( 'chosen_shipping_methods' );
+
+		WC()->cart->empty_cart( true );
+		$added_key = WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $attributes );
+		if ( ! $added_key ) {
+			WC()->cart->empty_cart( true );
+			foreach ( $original_items as $item ) {
+				WC()->cart->add_to_cart(
+					$item['product_id'],
+					max( 1, (int) $item['quantity'] ),
+					$item['variation_id'],
+					$item['variation'],
+					$item['cart_item_data']
+				);
+			}
+			if ( ! empty( $original_coupons ) ) {
+				foreach ( $original_coupons as $code ) {
+					WC()->cart->apply_coupon( $code );
+				}
+			}
+			if ( null !== $original_shipping ) {
+				WC()->session->set( 'chosen_shipping_methods', $original_shipping );
+			}
+			WC()->cart->calculate_totals();
+
+			return $this->build_light_preview_payload( $product_id, $quantity, $variation_id, $attributes, $coupon_codes );
+		}
+
+		$codes = array();
+		foreach ( (array) $coupon_codes as $code ) {
+			$code = wc_clean( $code );
+			if ( $code ) {
+				$codes[] = $code;
+			}
+		}
+		$codes = array_unique( $codes );
+		foreach ( $codes as $code ) {
+			WC()->cart->apply_coupon( $code );
+		}
+
+		WC()->cart->calculate_totals();
+
+		$preview = $this->build_light_preview_payload( $product_id, $quantity, $variation_id, $attributes, $coupon_codes );
+
+		$preview['shipping'] = $this->build_shipping_payload();
+		$preview['payment']  = $this->build_payment_payload();
+		$preview['coupons']  = $this->build_coupon_payload();
+		$preview['notices']  = $this->build_notices();
+		$preview['subtotal'] = WC()->cart->get_cart_subtotal();
+		$preview['subtotal_raw'] = (float) WC()->cart->get_subtotal();
+		$discount_raw = (float) WC()->cart->get_discount_total();
+		$preview['discount_total_raw'] = $discount_raw;
+		$preview['discount_total'] = $discount_raw ? wc_price( $discount_raw ) : '';
+		$tax_total_raw = (float) WC()->cart->get_total_tax();
+		$preview['tax_total_raw'] = $tax_total_raw;
+		$preview['tax_total'] = $tax_total_raw ? wc_price( $tax_total_raw ) : '';
+		$shipping_tax_raw = (float) WC()->cart->get_shipping_tax();
+		$preview['shipping_tax_total_raw'] = $shipping_tax_raw;
+		$preview['shipping_tax_total'] = $shipping_tax_raw ? wc_price( $shipping_tax_raw ) : '';
+		$preview['total'] = WC()->cart->get_total();
+		$preview['total_raw'] = (float) WC()->cart->get_total( 'edit' );
+		$preview['hash'] = WC()->cart->get_cart_hash();
+		$preview['itemCount'] = WC()->cart->get_cart_contents_count();
+		$preview['estimated'] = false;
+
+		WC()->cart->empty_cart( true );
+		foreach ( $original_items as $item ) {
+			WC()->cart->add_to_cart(
+				$item['product_id'],
+				max( 1, (int) $item['quantity'] ),
+				$item['variation_id'],
+				$item['variation'],
+				$item['cart_item_data']
+			);
+		}
+		if ( ! empty( $original_coupons ) ) {
+			foreach ( $original_coupons as $code ) {
+				WC()->cart->apply_coupon( $code );
+			}
+		}
+		if ( null !== $original_shipping ) {
+			WC()->session->set( 'chosen_shipping_methods', $original_shipping );
+		}
+		WC()->cart->calculate_totals();
+
+		return $preview;
+	}
+
+	/**
 	 * Build shipping payload for light preview (no cart dependency).
 	 *
 	 * @param WC_Product $product

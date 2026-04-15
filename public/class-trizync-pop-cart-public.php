@@ -478,6 +478,24 @@ class Trizync_Pop_Cart_Public {
 		}
 		add_filter( 'woocommerce_checkout_fields', array( $this, 'filter_checkout_fields' ) );
 		add_filter( 'woocommerce_checkout_fields', array( $this, 'maybe_remove_billing_heading' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( $this, 'filter_popcart_checkout_validation' ), 20, 2 );
+	}
+
+	/**
+	 * Inject PopCart source attributes into checkout buttons (classic templates).
+	 *
+	 * @since 1.0.0
+	 */
+	public function enable_checkout_button_overrides() {
+		if ( ! $this->is_enabled() ) {
+			return;
+		}
+		add_filter( 'woocommerce_widget_shopping_cart_button_checkout', array( $this, 'filter_mini_cart_checkout_button' ), 10 );
+		add_filter( 'woocommerce_widget_shopping_cart_button_view_cart', array( $this, 'filter_mini_cart_checkout_button' ), 10 );
+		if ( function_exists( 'remove_action' ) ) {
+			remove_action( 'woocommerce_proceed_to_checkout', 'woocommerce_button_proceed_to_checkout', 20 );
+			add_action( 'woocommerce_proceed_to_checkout', array( $this, 'render_cart_checkout_button' ), 20 );
+		}
 	}
 
 	/**
@@ -849,13 +867,7 @@ class Trizync_Pop_Cart_Public {
 			return $fields;
 		}
 
-		$enabled_keys = array();
-		foreach ( $config as $field ) {
-			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
-				continue;
-			}
-			$enabled_keys[] = sanitize_key( $field['key'] );
-		}
+		$enabled_keys = $this->get_popcart_enabled_field_keys( $config );
 
 		foreach ( $fields as $group => $group_fields ) {
 			if ( ! is_array( $group_fields ) ) {
@@ -868,7 +880,6 @@ class Trizync_Pop_Cart_Public {
 				$clean_key = sanitize_key( $key );
 				if ( ! in_array( $clean_key, $enabled_keys, true ) ) {
 					$field_data['required'] = false;
-					unset( $fields[ $group ][ $key ] );
 				}
 			}
 			unset( $field_data );
@@ -925,6 +936,134 @@ class Trizync_Pop_Cart_Public {
 		}
 
 		return $fields;
+	}
+
+	/**
+	 * Add source attributes to mini-cart checkout/view cart buttons.
+	 *
+	 * @since 1.0.0
+	 * @param string $button
+	 * @return string
+	 */
+	public function filter_mini_cart_checkout_button( $button ) {
+		if ( empty( $button ) || false === strpos( $button, '<a' ) ) {
+			return $button;
+		}
+		if ( false === strpos( $button, 'data-popcart-source' ) ) {
+			$button = preg_replace(
+				'/<a\\s/i',
+				'<a data-popcart-source="mini_cart" data-trizync-pop-cart-open="cart" ',
+				$button,
+				1
+			);
+		}
+		return $button;
+	}
+
+	/**
+	 * Render cart page checkout button with PopCart source attributes.
+	 *
+	 * @since 1.0.0
+	 */
+	public function render_cart_checkout_button() {
+		$checkout_url = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '';
+		$text = apply_filters( 'woocommerce_proceed_to_checkout_button_text', __( 'Proceed to checkout', 'woocommerce' ) );
+		printf(
+			'<a href="%1$s" class="checkout-button button alt wc-forward" data-popcart-source="cart_page" data-trizync-pop-cart-open="cart">%2$s</a>',
+			esc_url( $checkout_url ),
+			esc_html( $text )
+		);
+	}
+
+	/**
+	 * Relax validation for checkout fields not enabled in PopCart.
+	 *
+	 * @since 1.0.0
+	 * @param array    $data
+	 * @param WP_Error $errors
+	 * @return void
+	 */
+	public function filter_popcart_checkout_validation( $data, $errors ) {
+		if ( empty( $_REQUEST['trizync_pop_cart'] ) ) {
+			return;
+		}
+
+		if ( ! defined( 'TRIZYNC_POP_CART_OPTION_FIELDS' ) ) {
+			return;
+		}
+
+		$raw = get_option( TRIZYNC_POP_CART_OPTION_FIELDS );
+		if ( empty( $raw ) ) {
+			return;
+		}
+
+		$config = json_decode( $raw, true );
+		if ( ! is_array( $config ) ) {
+			return;
+		}
+
+		$enabled_keys = $this->get_popcart_enabled_field_keys( $config );
+		if ( empty( $enabled_keys ) ) {
+			return;
+		}
+
+		$required_fields = array();
+		foreach ( $config as $field ) {
+			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+			$required = ( isset( $field['rule'] ) && 'required' === $field['rule'] ) || ! empty( $field['required'] );
+			if ( $required ) {
+				$key = sanitize_key( $field['key'] );
+				$required_fields[ $key ] = isset( $field['label'] ) ? $field['label'] : $key;
+			}
+		}
+
+		foreach ( $required_fields as $key => $label ) {
+			$value = '';
+			if ( isset( $data[ $key ] ) ) {
+				$value = $data[ $key ];
+			} elseif ( isset( $_POST[ $key ] ) ) {
+				$value = wp_unslash( $_POST[ $key ] );
+			}
+			if ( is_array( $value ) ) {
+				$value = implode( '', $value );
+			}
+			if ( '' === trim( (string) $value ) ) {
+				$errors->add(
+					'required_' . $key,
+					sprintf( __( '%s is a required field.', 'trizync-pop-cart' ), $label )
+				);
+			}
+		}
+
+		foreach ( (array) $errors->get_error_codes() as $code ) {
+			$field_key = sanitize_key( $code );
+			if ( 0 === strpos( $field_key, 'required_' ) ) {
+				$field_key = sanitize_key( substr( $field_key, 9 ) );
+			}
+			if ( $field_key && ! in_array( $field_key, $enabled_keys, true ) ) {
+				$errors->remove( $code );
+			}
+		}
+	}
+
+	/**
+	 * Get enabled PopCart field keys from config.
+	 *
+	 * @since 1.0.0
+	 * @param array $config
+	 * @return array
+	 */
+	protected function get_popcart_enabled_field_keys( $config ) {
+		$enabled_keys = array();
+		foreach ( (array) $config as $field ) {
+			if ( empty( $field['enabled'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+			$enabled_keys[] = sanitize_key( $field['key'] );
+		}
+		return array_values( array_unique( $enabled_keys ) );
 	}
 
 	/**
@@ -1776,85 +1915,180 @@ class Trizync_Pop_Cart_Public {
 	 * @since 1.0.0
 	 * @return array
 	 */
-	protected function build_shipping_methods_fallback() {
-		if ( ! function_exists( 'WC' ) || ! WC()->shipping() ) {
-			return array(
-				'methods' => array(),
-				'chosen'  => '',
-				'total'   => '',
-			);
-		}
-		if ( ! class_exists( 'WC_Shipping_Zones' ) || ! class_exists( 'WC_Shipping_Zone' ) ) {
-			return array(
-				'methods' => array(),
-				'chosen'  => '',
-				'total'   => '',
-			);
-		}
+protected function build_shipping_methods_fallback() {
+    if ( ! function_exists( 'WC' ) ) {
+        return $this->empty_shipping_payload();
+    }
 
-		WC()->shipping()->init();
+    if ( ! WC()->shipping() ) {
+        return $this->empty_shipping_payload();
+    }
 
-		$zones = WC_Shipping_Zones::get_zones();
-		$zones[] = array(
-			'zone_id' => 0,
-		);
+    if ( ! class_exists( 'WC_Shipping_Zones' ) || ! class_exists( 'WC_Shipping_Zone' ) ) {
+        if ( defined( 'WC_ABSPATH' ) ) {
+            $zones_path = WC_ABSPATH . 'includes/class-wc-shipping-zones.php';
+            $zone_path  = WC_ABSPATH . 'includes/class-wc-shipping-zone.php';
+            if ( file_exists( $zones_path ) ) {
+                require_once $zones_path;
+            }
+            if ( file_exists( $zone_path ) ) {
+                require_once $zone_path;
+            }
+        }
+    }
+    if ( ! class_exists( 'WC_Shipping_Zones' ) || ! class_exists( 'WC_Shipping_Zone' ) ) {
+        return $this->empty_shipping_payload();
+    }
 
-		$methods = array();
-		foreach ( $zones as $zone_data ) {
-			$zone = new WC_Shipping_Zone( $zone_data['zone_id'] );
-			foreach ( $zone->get_shipping_methods( true ) as $method ) {
-				if ( ! $method || ! $method->enabled ) {
-					continue;
-				}
-				$instance_id = $method->get_instance_id();
-				$method_id = $method->get_method_id();
-				$rate_id = $method_id . ':' . $instance_id;
-				$cost = 0.0;
-				if ( isset( $method->cost ) && '' !== $method->cost ) {
-					$cost = (float) $method->cost;
-				} elseif ( isset( $method->settings['cost'] ) && '' !== $method->settings['cost'] ) {
-					$cost = (float) $method->settings['cost'];
-				}
-				$methods[ $rate_id ] = array(
-					'id'        => $rate_id,
-					'label'     => $method->get_title(),
-					'price'     => wc_price( $cost ),
-					'selected'  => false,
-					'method_id' => $method_id,
-					'cost_raw'  => $cost,
-				);
-			}
-		}
+    try {
+        WC()->shipping()->init();
+        WC()->shipping()->load_shipping_methods();
+    } catch ( Throwable $e ) {
+        error_log( 'WC load_shipping_methods failed: ' . $e->getMessage() );
+    }
 
-		if ( empty( $methods ) ) {
-			return array(
-				'methods' => array(),
-				'chosen'  => '',
-				'total'   => '',
-			);
-		}
+    $zone_ids      = array_merge( [ 0 ], array_column( WC_Shipping_Zones::get_zones(), 'zone_id' ) );
+    $methods       = [];
+    $zones_payload = [];
 
-		$chosen_id = '';
-		$max_cost = -1;
-		foreach ( $methods as $rate_id => $method ) {
-			if ( $method['cost_raw'] >= $max_cost ) {
-				$max_cost = $method['cost_raw'];
-				$chosen_id = $rate_id;
-			}
-		}
+    foreach ( $zone_ids as $zone_id ) {
+        try {
+            $zone         = new WC_Shipping_Zone( $zone_id );
+            $zone_name    = $zone->get_zone_name();
+            $zone_methods = $zone->get_shipping_methods( true ); // enabled only
 
-		foreach ( $methods as $rate_id => &$method ) {
-			$method['selected'] = ( $rate_id === $chosen_id );
-			unset( $method['cost_raw'] );
-		}
-		unset( $method );
+            $zones_payload[] = [
+                'id'   => $zone->get_id(),
+                'name' => $zone_name,
+            ];
 
-		return array(
-			'methods'   => array_values( $methods ),
-			'chosen'    => $chosen_id,
-			'total'     => $chosen_id && isset( $methods[ $chosen_id ] ) ? $methods[ $chosen_id ]['price'] : '',
-			'total_raw' => $max_cost > 0 ? $max_cost : 0,
-		);
+            foreach ( $zone_methods as $method ) {
+                // ✅ Use ->id not get_method_id() — doesn't exist on all method classes
+                $method_id   = $method->id;
+                $instance_id = $method->get_instance_id();
+                $rate_id     = $method_id . ':' . $instance_id;
+
+                // Skip duplicates
+                if ( isset( $methods[ $rate_id ] ) ) {
+                    continue;
+                }
+
+                // ✅ Use is_enabled() — more reliable than ->enabled string
+                if ( ! $method->is_enabled() ) {
+                    continue;
+                }
+
+                $cost = $this->resolve_method_cost( $method );
+
+                $methods[ $rate_id ] = [
+                    'id'        => $rate_id,
+                    'label'     => $method->get_title(),
+                    'price'     => wc_price( $cost ),
+                    'price_raw' => $cost,
+                    'cost_raw'  => $cost,
+                    'selected'  => false,
+                    'method_id' => $method_id,
+                    'zone_id'   => $zone->get_id(),
+                    'zone_name' => $zone_name,
+                ];
+
+            }
+        } catch ( Throwable $e ) {
+            error_log( "Skipping zone {$zone_id}: " . $e->getMessage() );
+            continue;
+        }
+    }
+
+    if ( empty( $methods ) ) {
+        return $this->empty_shipping_payload( $zones_payload );
+    }
+
+    $chosen_id  = $this->resolve_chosen_method( $methods );
+    $total_raw  = $methods[ $chosen_id ]['cost_raw'] ?? 0.0;
+
+    foreach ( $methods as $rate_id => &$method ) {
+        $method['selected'] = ( $rate_id === $chosen_id );
+        unset( $method['cost_raw'] );
+    }
+    unset( $method );
+
+    $methods = array_values( $methods );
+    usort(
+        $methods,
+        function ( $a, $b ) {
+            $zone_cmp = strcmp( (string) ( $a['zone_name'] ?? '' ), (string) ( $b['zone_name'] ?? '' ) );
+            if ( 0 !== $zone_cmp ) {
+                return $zone_cmp;
+            }
+            return strcmp( (string) ( $a['label'] ?? '' ), (string) ( $b['label'] ?? '' ) );
+        }
+    );
+
+    return [
+        'methods'   => $methods,
+        'zones'     => $zones_payload,
+        'chosen'    => $chosen_id,
+        'total'     => wc_price( $total_raw ),
+        'total_raw' => $total_raw,
+    ];
+}
+
+/**
+ * Resolve cost from a shipping method — covers flat rate, local pickup, free shipping.
+ */
+private function resolve_method_cost( WC_Shipping_Method $method ): float {
+    if ( $method->id === 'free_shipping' ) {
+        return 0.0;
+    }
+
+    if ( isset( $method->cost ) && $method->cost !== '' ) {
+        return (float) $method->cost;
+    }
+
+    if ( ! empty( $method->settings['cost'] ) ) {
+        return (float) $method->settings['cost'];
+    }
+
+    $option_cost = $method->get_option( 'cost' );
+    if ( $option_cost !== '' && $option_cost !== null ) {
+        return (float) $option_cost;
+    }
+
+    return 0.0;
+}
+
+/**
+ * Pick cheapest paid method, fallback to first (free shipping etc).
+ */
+private function resolve_chosen_method( array $methods ): string {
+    if ( empty( $methods ) ) {
+        return '';
+    }
+
+    $max_id   = '';
+    $max_cost = null;
+    foreach ( $methods as $rate_id => $method ) {
+        $cost = isset( $method['cost_raw'] ) ? (float) $method['cost_raw'] : 0.0;
+        if ( null === $max_cost || $cost > $max_cost ) {
+            $max_cost = $cost;
+            $max_id   = $rate_id;
+        }
+    }
+
+    return $max_id ?: array_key_first( $methods );
+}
+
+	/**
+	 * Empty payload helper.
+	 */
+	public function empty_shipping_payload( array $zones = [] ): array {
+		return [
+			'methods'   => [],
+			'zones'     => $zones,
+			'chosen'    => '',
+			'total'     => '',
+			'total_raw' => 0.0,
+		];
 	}
 
 	/**
@@ -2008,6 +2242,14 @@ class Trizync_Pop_Cart_Public {
 
 		if ( function_exists( 'wc_load_cart' ) ) {
 			wc_load_cart();
+		}
+
+		if ( WC()->session && method_exists( WC()->session, 'init' ) ) {
+			WC()->session->init();
+		}
+
+		if ( WC()->cart ) {
+			WC()->cart->get_cart();
 		}
 
 		if ( WC()->session && ! WC()->session->has_session() ) {
