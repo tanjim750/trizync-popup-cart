@@ -22,6 +22,8 @@
     cart: null,
     coupons: null,
     context: null,
+    wc_checkout_nonce:
+      (TrizyncPopCart && TrizyncPopCart.wooCheckoutNonce) || null,
     meta: {
       popup_type: null,
     },
@@ -41,35 +43,57 @@
 
   function mergeUiState(partial) {
     lightUiState = {
-      product: partial.product !== undefined ? partial.product : lightUiState.product,
-      shipping: partial.shipping !== undefined ? partial.shipping : lightUiState.shipping,
-      payment: partial.payment !== undefined ? partial.payment : lightUiState.payment,
-      totals: partial.totals !== undefined ? partial.totals : lightUiState.totals,
-      fields: partial.fields !== undefined ? partial.fields : lightUiState.fields,
-      values: partial.values !== undefined ? partial.values : lightUiState.values,
+      product:
+        partial.product !== undefined ? partial.product : lightUiState.product,
+      shipping:
+        partial.shipping !== undefined
+          ? partial.shipping
+          : lightUiState.shipping,
+      payment:
+        partial.payment !== undefined ? partial.payment : lightUiState.payment,
+      totals:
+        partial.totals !== undefined ? partial.totals : lightUiState.totals,
+      fields:
+        partial.fields !== undefined ? partial.fields : lightUiState.fields,
+      values:
+        partial.values !== undefined ? partial.values : lightUiState.values,
       cart: partial.cart !== undefined ? partial.cart : lightUiState.cart,
-      coupons: partial.coupons !== undefined ? partial.coupons : lightUiState.coupons,
-      context: partial.context !== undefined ? partial.context : lightUiState.context,
-      meta: partial.meta !== undefined
-        ? Object.assign({}, lightUiState.meta, partial.meta)
-        : lightUiState.meta,
-      ui: partial.ui !== undefined
-        ? {
-            loading:
-              partial.ui.loading !== undefined
-                ? partial.ui.loading
-                : lightUiState.ui.loading,
-            error:
-              partial.ui.error !== undefined
-                ? partial.ui.error
-                : lightUiState.ui.error,
-            sections:
-              partial.ui.sections !== undefined
-                ? Object.assign({}, lightUiState.ui.sections, partial.ui.sections)
-                : lightUiState.ui.sections,
-          }
-        : lightUiState.ui,
+      coupons:
+        partial.coupons !== undefined ? partial.coupons : lightUiState.coupons,
+      context:
+        partial.context !== undefined ? partial.context : lightUiState.context,
+      wc_checkout_nonce:
+        partial.wc_checkout_nonce !== undefined
+          ? partial.wc_checkout_nonce
+          : lightUiState.wc_checkout_nonce,
+      meta:
+        partial.meta !== undefined
+          ? Object.assign({}, lightUiState.meta, partial.meta)
+          : lightUiState.meta,
+      ui:
+        partial.ui !== undefined
+          ? {
+              loading:
+                partial.ui.loading !== undefined
+                  ? partial.ui.loading
+                  : lightUiState.ui.loading,
+              error:
+                partial.ui.error !== undefined
+                  ? partial.ui.error
+                  : lightUiState.ui.error,
+              sections:
+                partial.ui.sections !== undefined
+                  ? Object.assign(
+                      {},
+                      lightUiState.ui.sections,
+                      partial.ui.sections,
+                    )
+                  : lightUiState.ui.sections,
+            }
+          : lightUiState.ui,
     };
+
+    console.log("[popcart light] updated ui state", lightUiState);
   }
 
   function setState(partial, source) {
@@ -80,13 +104,18 @@
       last_update_ts: new Date().toISOString(),
     });
     if (window.TrizyncPopCartLight && window.TrizyncPopCartLight.debugState) {
-      console.log("[popcart light] state update", {
-        source: source || null,
-        changed: getChangedKeys(prev, lightUiState),
-        state: lightUiState,
-      });
+      //   console.log("[popcart light] state update", {
+      //     source: source || null,
+      //     changed: getChangedKeys(prev, lightUiState),
+      //     state: lightUiState,
+      //   });
     }
-    notifySubscribers(prev, lightUiState, getChangedKeys(prev, lightUiState), source);
+    notifySubscribers(
+      prev,
+      lightUiState,
+      getChangedKeys(prev, lightUiState),
+      source,
+    );
   }
 
   function getState() {
@@ -96,8 +125,16 @@
   function isUiFullyLoaded(state) {
     var s = state || lightUiState;
     var hasProduct = !!(s.product && s.product.product);
-    var hasShipping = !!(s.shipping && s.shipping.methods && s.shipping.methods.length);
-    var hasPayment = !!(s.payment && s.payment.gateways && s.payment.gateways.length);
+    var hasShipping = !!(
+      s.shipping &&
+      s.shipping.methods &&
+      s.shipping.methods.length
+    );
+    var hasPayment = !!(
+      s.payment &&
+      s.payment.gateways &&
+      s.payment.gateways.length
+    );
     var hasFields = !!(s.fields && s.fields.length);
     var hasValues = !!(s.values && Object.keys(s.values).length);
     return hasProduct && hasShipping && hasPayment && hasFields && hasValues;
@@ -240,13 +277,22 @@
       showEmptyCart();
     }
 
-    if (state.product && state.product.product && state.product.product.variations && state.product.product.variations.length) {
+    if (
+      state.product &&
+      state.product.product &&
+      state.product.product.variations &&
+      state.product.product.variations.length
+    ) {
       showVariationsSection();
     } else {
       hideVariationsSection();
     }
 
-    if (state.shipping && state.shipping.methods && state.shipping.methods.length) {
+    if (
+      state.shipping &&
+      state.shipping.methods &&
+      state.shipping.methods.length
+    ) {
       showShippingSection();
     } else {
       hideShippingSection();
@@ -258,7 +304,11 @@
       hideTotalsSection();
     }
 
-    if (state.payment && state.payment.gateways && state.payment.gateways.length) {
+    if (
+      state.payment &&
+      state.payment.gateways &&
+      state.payment.gateways.length
+    ) {
       showPaymentSection();
     } else {
       hidePaymentSection();
@@ -307,7 +357,7 @@
       updateShippingMethods(next.shipping);
       updateTotalsWithShipping(
         next.shipping.total_raw || 0,
-        next.shipping.total || ""
+        next.shipping.total || "",
       );
     }
 
@@ -328,10 +378,7 @@
       var countEl = document.querySelector("[data-trizync-pop-cart-count]");
       if (countEl) {
         var count =
-          next.cart.items_count ||
-          next.cart.qty_total ||
-          next.cart.count ||
-          0;
+          next.cart.items_count || next.cart.qty_total || next.cart.count || 0;
         countEl.textContent = count;
       }
     }
@@ -366,7 +413,35 @@
 
   function applyCartStateFromResponse(response, source) {
     if (response && response.success && response.data) {
-      setState({ cart: response.data }, source || "cart");
+      var cart = response.data;
+      var existingShipping = (lightUiState && lightUiState.shipping) || {
+        methods: [],
+      };
+      var nextShipping = {
+        methods: existingShipping.methods || [],
+        chosen: cart.shipping ? cart.shipping.chosen : existingShipping.chosen,
+        total: cart.shipping ? cart.shipping.total : existingShipping.total,
+        total_raw: cart.shipping
+          ? cart.shipping.total_raw
+          : existingShipping.total_raw,
+        zones: existingShipping.zones || [],
+      };
+      var nextTotals = $.extend({}, lightUiState.totals || {}, {
+        subtotal: cart.subtotal,
+        subtotal_raw: cart.subtotal_raw,
+        total: cart.total,
+        total_raw: cart.total_raw,
+        shipping: nextShipping,
+      });
+      setState(
+        { cart: cart, shipping: nextShipping, totals: nextTotals },
+        "set_shipping_method",
+      );
+    } else {
+      if (rollback) {
+        setState(rollback, source + "_failed");
+      }
+      renderErrorMessage("Sorry, unable to update cart state.");
     }
   }
 
@@ -604,6 +679,27 @@
     );
   }
 
+  function fetchWooCheckoutNonce() {
+    return postAction(
+      "trizync_pop_cart_get_wc_checkout_nonce",
+      {},
+      "nonce_preview",
+    ).then(function (res) {
+      var nonce =
+        res &&
+        res.success &&
+        res.data &&
+        res.data["woocommerce-process-checkout-nonce"]
+          ? res.data["woocommerce-process-checkout-nonce"]
+          : "";
+      if (nonce) {
+        setState({ wc_checkout_nonce: nonce }, "fetch_wc_checkout_nonce");
+        return nonce;
+      }
+      return $.Deferred().reject(res).promise();
+    });
+  }
+
   function getCart(ping) {
     return postAction(
       "trizync_pop_cart_get_cart",
@@ -618,11 +714,11 @@
 
   function getShippingMethods(context) {
     var ctx = normalizeContext(context);
-    console.log("[popcart light] getShippingMethods payload", {
-      product_id: ctx.product_id,
-      variation_id: ctx.variation_id,
-      quantity: ctx.quantity,
-    });
+    // console.log("[popcart light] getShippingMethods payload", {
+    //   product_id: ctx.product_id,
+    //   variation_id: ctx.variation_id,
+    //   quantity: ctx.quantity,
+    // });
     return postAction(
       "trizync_pop_cart_get_shipping_methods_light",
       {
@@ -716,14 +812,10 @@
   }
 
   function updateCartItem(key, quantity) {
-    return postAction(
-      "trizync_pop_cart_update_cart_item",
-      {
-        key: key,
-        quantity: quantity,
-      },
-      "nonce_checkout",
-    ).done(function (response) {
+    return postAction("trizync_pop_cart_update_cart_item", {
+      cart_item_key: key,
+      quantity: quantity,
+    }).done(function (response) {
       applyCartStateFromResponse(response, "update_cart_item");
     });
   }
@@ -741,11 +833,13 @@
   }
 
   function restoreCart() {
-    return postAction("trizync_pop_cart_restore_cart", {}, "nonce_checkout").done(
-      function (response) {
-        applyCartStateFromResponse(response, "restore_cart");
-      },
-    );
+    return postAction(
+      "trizync_pop_cart_restore_cart",
+      {},
+      "nonce_checkout",
+    ).done(function (response) {
+      applyCartStateFromResponse(response, "restore_cart");
+    });
   }
 
   function prepareProductCheckout(context) {
@@ -803,7 +897,7 @@
     var shippingChosen =
       (lightUiState.shipping && lightUiState.shipping.chosen) || "";
     var paymentChosen =
-      (lightUiState.payment && lightUiState.payment.chosen) || "";
+      (lightUiState.payment && lightUiState.payment.chosen) || "cod";
 
     return postAction(
       "trizync_pop_cart_create_order",
@@ -813,11 +907,42 @@
         quantity: ctx.quantity,
         attributes: JSON.stringify(ctx.attributes || {}),
         coupons: JSON.stringify(normalizeCoupons(coupons)),
-        shipping_method: shippingChosen,
+
+        "shipping_method[0]": shippingChosen,
         payment_method: paymentChosen,
-        customer: JSON.stringify(payload),
         terms: 1,
+        "woocommerce-process-checkout-nonce":
+          lightUiState.wc_checkout_nonce ||
+          (TrizyncPopCart && TrizyncPopCart.wooCheckoutNonce) ||
+          "",
+        _wp_http_referer: "/checkout/",
         trizync_pop_cart: 1,
+
+        billing_first_name: payload.billing_first_name || "",
+        billing_last_name: payload.billing_last_name || "",
+        billing_phone: payload.billing_phone || "",
+        billing_email: payload.billing_email || "",
+        billing_address_1: payload.billing_address_1 || "",
+        billing_address_2: payload.billing_address_2 || "",
+        billing_city: payload.billing_city || "",
+        billing_state: payload.billing_state || "",
+        billing_postcode: payload.billing_postcode || "",
+        billing_country: payload.billing_country || "BD",
+
+        shipping_first_name:
+          payload.shipping_first_name || payload.billing_first_name || "",
+        shipping_last_name:
+          payload.shipping_last_name || payload.billing_last_name || "",
+        shipping_address_1:
+          payload.shipping_address_1 || payload.billing_address_1 || "",
+        shipping_address_2:
+          payload.shipping_address_2 || payload.billing_address_2 || "",
+        shipping_city: payload.shipping_city || payload.billing_city || "",
+        shipping_state: payload.shipping_state || payload.billing_state || "",
+        shipping_postcode:
+          payload.shipping_postcode || payload.billing_postcode || "",
+        shipping_country:
+          payload.shipping_country || payload.billing_country || "BD",
       },
       "nonce_checkout",
     );
@@ -868,8 +993,12 @@
       .done(function (response) {
         if (response && response.success && response.data) {
           var cart = response.data;
-          var existingShipping =
-            (lightUiState && lightUiState.shipping) || { methods: [] };
+          var existingShipping = (lightUiState && lightUiState.shipping) || {
+            methods: [],
+          };
+          console.log("[popcart shipping] existingShipping", existingShipping);
+          console.log("[popcart shipping] cart.shipping", cart.shipping);
+
           var nextShipping = {
             methods: existingShipping.methods || [],
             chosen: cart.shipping
@@ -881,6 +1010,7 @@
               : existingShipping.total_raw,
             zones: existingShipping.zones || [],
           };
+          console.log("[popcart shipping] nextShipping", nextShipping);
           var nextTotals = $.extend({}, lightUiState.totals || {}, {
             subtotal: cart.subtotal,
             subtotal_raw: cart.subtotal_raw,
@@ -1596,7 +1726,12 @@
       hiddenInput.value = shipping.chosen || "";
     }
 
-    if (shipping && shipping.chosen && shipping.methods && shipping.methods.length) {
+    if (
+      shipping &&
+      shipping.chosen &&
+      shipping.methods &&
+      shipping.methods.length
+    ) {
       var chosenMethod = shipping.methods.find(function (method) {
         return method.id === shipping.chosen;
       });
@@ -1606,7 +1741,7 @@
           typeof chosenMethod.price_raw !== "undefined"
             ? chosenMethod.price_raw
             : chosenMethod.total_raw || 0,
-          chosenMethod.price || ""
+          chosenMethod.price || "",
         );
       }
     }
@@ -1757,7 +1892,8 @@
         ? Number(lastSubtotalPayload.total_raw)
         : subtotalRaw + prevShippingRaw;
 
-    var newTotalRaw = totalRaw - prevShippingRaw + Number(shippingPriceRaw || 0);
+    var newTotalRaw =
+      totalRaw - prevShippingRaw + Number(shippingPriceRaw || 0);
 
     var popup = getPopup();
     if (!popup) {
@@ -1777,7 +1913,8 @@
       }
     }
     if (totalEl) {
-      var template = lastSubtotalPayload.total || lastSubtotalPayload.subtotal || "";
+      var template =
+        lastSubtotalPayload.total || lastSubtotalPayload.subtotal || "";
       totalEl.innerHTML = formatPriceHtml(newTotalRaw, template);
     }
   }
@@ -1818,7 +1955,7 @@
   }
 
   function renderNoticesHtml(html) {
-	console.log("Rendering notices with HTML:", html);
+    console.log("Rendering notices with HTML:", html);
     var popup = getPopup();
     if (!popup) {
       return;
@@ -1881,6 +2018,46 @@
       return null;
     }
     return popup.querySelector("[data-trizync-pop-cart-checkout]");
+  }
+
+  // Inject (or overwrite) a field into the light-flow checkout form inside the popup.
+  // This is useful for adding hidden fields (e.g. popcart_* meta) that should be included
+  // in the `customer` payload sent during order creation.
+  function injectFieldIntoCheckoutForm(name, value, options) {
+    options = options || {};
+    var container = getCheckoutContainer();
+    if (!container) {
+      return null;
+    }
+
+    var form = container.querySelector("form[data-trizync-pop-cart-form]");
+    if (!form) {
+      return null;
+    }
+
+    var fieldName = String(name || "");
+    if (!fieldName) {
+      return null;
+    }
+
+    var input = form.querySelector('[name="' + fieldName + '"]');
+    if (!input) {
+      input = document.createElement("input");
+      input.name = fieldName;
+      input.type = options.type || "hidden";
+      input.className =
+        "trizync-pop-cart__input trizync-pop-cart__input--hidden";
+      input.setAttribute("data-popcart-injected", "1");
+      form.appendChild(input);
+    }
+
+    // Allow switching input type only for input elements.
+    if (options.type && input.type !== options.type) {
+      input.type = options.type;
+    }
+
+    input.value = value == null ? "" : String(value);
+    return input;
   }
 
   function renderFieldsFromJson(fields) {
@@ -2092,7 +2269,7 @@
   }
 
   function getCheckoutContextFromState() {
-	console.log("Getting checkout context from state:", lightUiState);
+    console.log("Getting checkout context from state:", lightUiState);
     if (lightUiState.context) {
       return normalizeContext(lightUiState.context);
     }
@@ -2169,7 +2346,11 @@
       updateCustomerInfo(payload).always(function () {
         createOrder(context, payload, lightUiState.coupons || [])
           .done(function (response) {
-            if (response && response.result === "success" && response.redirect) {
+            if (
+              response &&
+              response.result === "success" &&
+              response.redirect
+            ) {
               window.location.href = response.redirect;
               return;
             }
@@ -2245,10 +2426,12 @@
     updateCustomerInfo: updateCustomerInfo,
     updateSubtotal: updateSubtotal,
     warmSession: warmSession,
+    fetchWooCheckoutNonce: fetchWooCheckoutNonce,
     getCheckoutForm: getCheckoutForm,
     getNotices: getNotices,
     prepareCheckout: prepareCheckout,
     createOrder: createOrder,
+    injectFieldIntoCheckoutForm: injectFieldIntoCheckoutForm,
     prepareProductCheckout: prepareProductCheckout,
     applyCoupon: applyCoupon,
     removeCoupon: removeCoupon,
@@ -2357,7 +2540,7 @@
 
   function openPopupFlow(trigger) {
     var context = resolveProductContext(trigger);
-    console.log("[popcart light] openPopupFlow context", context);
+    // console.log("[popcart light] openPopupFlow context", context);
     lightCurrentContext = context;
     var popupMeta = resolvePopupType(trigger);
     setState(
@@ -2380,9 +2563,10 @@
     setState({ ui: { loaded: false } }, "popup_open");
     openPopup();
     setOverlayLoading(true);
-    warmSession().always( function() {
-    	setOverlayLoading( false );
-    } );
+    warmSession().always(function () {
+      setOverlayLoading(false);
+    });
+    fetchWooCheckoutNonce();
     wireLightCheckoutFields();
     wireFieldSync();
     wireCtaSubmit();
@@ -2417,9 +2601,12 @@
 
     getShippingMethods(context)
       .done(function (response) {
-        console.log("[popcart light] shipping methods response", response);
+        // console.log("[popcart light] shipping methods response", response);
         if (response && response.success && response.data) {
-          setState({ shipping: response.data.shipping || null }, "shipping_list");
+          setState(
+            { shipping: response.data.shipping || null },
+            "shipping_list",
+          );
         }
       })
       .fail(function () {
@@ -2435,9 +2622,12 @@
         return getAppliedShippingMethods(context, customerPayload);
       })
       .done(function (response) {
-        console.log("[popcart light] applied shipping response", response);
+        // console.log("[popcart light] applied shipping response", response);
         if (response && response.success && response.data) {
-          setState({ shipping: response.data.shipping || null }, "applied_shipping");
+          setState(
+            { shipping: response.data.shipping || null },
+            "applied_shipping",
+          );
         }
       })
       .fail(function () {
@@ -2454,16 +2644,22 @@
         renderErrorMessage("Unable to calculate totals.");
       });
 
-	  setTimeout(
-		() => console.log("current state at end of openPopupFlow:", getState()), 5000
-	  )
+    setTimeout(
+      () => console.log("current state at end of openPopupFlow:", getState()),
+      5000,
+    );
   }
 
   function openCartPopupFlow(trigger) {
     var popupMeta = resolvePopupType(trigger);
     setState(
       {
-        context: { product_id: 0, variation_id: 0, quantity: 0, attributes: {} },
+        context: {
+          product_id: 0,
+          variation_id: 0,
+          quantity: 0,
+          attributes: {},
+        },
         meta: {
           popup_type: "cart",
           popup_source: popupMeta.source,
@@ -2521,13 +2717,14 @@
         : null;
     if (trigger) {
       event.preventDefault();
-      var mode = trigger.getAttribute("data-trizync-pop-cart-open") || "product";
+      var mode =
+        trigger.getAttribute("data-trizync-pop-cart-open") || "product";
       if (mode === "cart") {
         openCartPopupFlow(trigger);
       } else {
         openPopupFlow(trigger);
       }
-    //   renderDummyPreviewSequence();
+      //   renderDummyPreviewSequence();
     }
     console.log("Open popup click triggered:", trigger);
   });
@@ -2582,7 +2779,9 @@
     var customList = parseCustomSelectors(TrizyncPopCart.customButtonSelectors);
     if (customList.length) {
       checkoutSelectors = uniqueSelectors(checkoutSelectors.concat(customList));
-      addToCartSelectors = uniqueSelectors(addToCartSelectors.concat(customList));
+      addToCartSelectors = uniqueSelectors(
+        addToCartSelectors.concat(customList),
+      );
     }
   }
 
@@ -2593,23 +2792,34 @@
     return target.closest(selectors.join(","));
   }
 
-  document.addEventListener("click", function (event) {
-    if (event.target && event.target.closest && event.target.closest("#trizync-pop-cart")) {
-      return;
-    }
-    if (!window.TrizyncPopCart || !TrizyncPopCart.replaceAddToCart) {
-      return;
-    }
-    var customTrigger = findClosestBySelectors(event.target, addToCartSelectors);
-    if (customTrigger) {
-      if (!customTrigger.getAttribute("data-trizync-pop-cart-open")) {
-        customTrigger.setAttribute("data-trizync-pop-cart-open", "product");
+  document.addEventListener(
+    "click",
+    function (event) {
+      if (
+        event.target &&
+        event.target.closest &&
+        event.target.closest("#trizync-pop-cart")
+      ) {
+        return;
       }
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openPopupFlow(customTrigger);
-    }
-  }, true);
+      if (!window.TrizyncPopCart || !TrizyncPopCart.replaceAddToCart) {
+        return;
+      }
+      var customTrigger = findClosestBySelectors(
+        event.target,
+        addToCartSelectors,
+      );
+      if (customTrigger) {
+        if (!customTrigger.getAttribute("data-trizync-pop-cart-open")) {
+          customTrigger.setAttribute("data-trizync-pop-cart-open", "product");
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openPopupFlow(customTrigger);
+      }
+    },
+    true,
+  );
 
   function ensureZyncopsProductAttributes() {
     var nodes = document.querySelectorAll('a[href*="add-to-cart="]');
@@ -2808,7 +3018,9 @@
       var key =
         this.getAttribute("data-cart-item-key") ||
         (this.closest("[data-cart-item-key]")
-          ? this.closest("[data-cart-item-key]").getAttribute("data-cart-item-key")
+          ? this.closest("[data-cart-item-key]").getAttribute(
+              "data-cart-item-key",
+            )
           : "");
       if (!key) {
         return;
@@ -2838,7 +3050,38 @@
     if (!lightCurrentContext) {
       return;
     }
+    const currentState = getState();
+
     prepareCheckout(lightCurrentContext);
+    fetchWooCheckoutNonce().done(function (nonceResponse) {
+      // console.log("[popcart light] Woo nonce response", nonceResponse);
+      // injectFieldIntoCheckoutForm("woocommerce-process-checkout-nonce", nonceResponse,{
+      // 	type: "hidden"
+      // });
+
+      lightUiState.wc_checkout_nonce = nonceResponse;
+    });
+
+    // if(currentState && currentState.payment) {
+    // 	injectFieldIntoCheckoutForm("payment_method", currentState.payment.chosen || 'cod', {
+    // 		type: "hidden"
+    // 	});
+    // }
+
+    // if(currentState && currentState.shipping && currentState.shipping.chosen) {
+    // 	injectFieldIntoCheckoutForm("shipping_method[0]", currentState.shipping.chosen, {
+    // 		type: "hidden"
+    // 	});
+    // }
+
+    // // Additional fields can be injected here as needed
+    // injectFieldIntoCheckoutForm("terms", "on", {
+    // 	type: "hidden"
+    // });
+
+    injectFieldIntoCheckoutForm("_wp_http_referer", "/checkout/", {
+      type: "hidden",
+    });
   });
 
   function renderDummyPreviewSequence() {

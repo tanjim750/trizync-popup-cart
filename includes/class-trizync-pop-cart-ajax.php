@@ -1356,58 +1356,69 @@ public function ajax_debug_shipping_zones() {
 public function ajax_create_order_test() {
     if ( ! $this->is_enabled() ) {
         wp_send_json_error( array( 'message' => 'disabled' ), 403 );
-        return;
     }
 
     $this->require_checkout_or_classic_nonce();
 
-    // ── Field filtering only ───────────────────────────────────────────────
+    if ( ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
+        wp_send_json_error( array( 'message' => 'empty_cart' ), 400 );
+    }
+
     $fields_meta   = $this->get_popcart_enabled_fields_meta();
-    $enabled_keys  = isset( $fields_meta['enabled_keys'] )  ? (array) $fields_meta['enabled_keys']  : array();
-    $required_keys = isset( $fields_meta['required_keys'] ) ? (array) $fields_meta['required_keys'] : array();
+    $enabled_keys  = isset( $fields_meta['enabled_keys'] ) ? array_map( 'sanitize_key', (array) $fields_meta['enabled_keys'] ) : array();
+    $required_keys = isset( $fields_meta['required_keys'] ) ? array_map( 'sanitize_key', (array) $fields_meta['required_keys'] ) : array();
 
     add_filter(
         'woocommerce_checkout_fields',
-        function( $fields ) use ( $enabled_keys, $required_keys ) {
+        function( $fields ) use ( $required_keys ) {
             foreach ( $fields as $group => $group_fields ) {
-                if ( ! is_array( $group_fields ) ) continue;
+                if ( ! is_array( $group_fields ) ) {
+                    continue;
+                }
+
                 foreach ( $group_fields as $key => $field_data ) {
-                    $fields[ $group ][ $key ]['required'] = isset( $required_keys[ sanitize_key( $key ) ] );
+                    $fields[ $group ][ $key ]['required'] = in_array( sanitize_key( $key ), $required_keys, true );
                 }
             }
+
             return $fields;
         },
         999
     );
 
-    // ── Auto-fill anything WC needs but PopCart isn't collecting ──────────
     $wcc = function_exists( 'WC' ) && WC()->countries ? WC()->countries : null;
+
     $fallbacks = array(
         'billing_first_name' => 'Customer',
         'billing_last_name'  => '',
-        'billing_email'      => wp_get_current_user()->user_email ?: 'guest@order.local',
+        'billing_email'      => wp_get_current_user()->user_email ?: 'guest@example.com',
         'billing_phone'      => '',
         'billing_address_1'  => 'N/A',
         'billing_city'       => $wcc ? $wcc->get_base_city()     : 'N/A',
         'billing_postcode'   => $wcc ? $wcc->get_base_postcode() : '0000',
         'billing_state'      => $wcc ? $wcc->get_base_state()    : '',
-        'billing_country'    => $wcc ? $wcc->get_base_country()  : 'US',
+        'billing_country'    => $wcc ? $wcc->get_base_country()  : 'BD',
     );
+
     foreach ( $fallbacks as $field => $fallback ) {
-        if ( ! in_array( $field, $enabled_keys, true ) && empty( $_POST[ $field ] ) ) {
+        if ( empty( $_POST[ $field ] ) ) {
             $_POST[ $field ] = $fallback;
         }
     }
 
-    // ── Standard WC POST fields ────────────────────────────────────────────
-    if ( ! isset( $_POST['woocommerce-process-checkout-nonce'] ) ) {
-        $_POST['woocommerce-process-checkout-nonce'] = wp_create_nonce( 'woocommerce-process_checkout' );
+    if ( ! isset( $_POST['terms'] ) ) {
+        $_POST['terms'] = 'on';
     }
+
     if ( ! isset( $_POST['_wp_http_referer'] ) ) {
         $_POST['_wp_http_referer'] = wc_get_checkout_url();
     }
 
-    // ── Fire WC and return raw result ──────────────────────────────────────
+    // Best: frontend theke valid Woo nonce ashbe
+    if ( empty( $_POST['woocommerce-process-checkout-nonce'] ) ) {
+        wp_send_json_error( array( 'message' => 'missing_woo_nonce' ), 400 );
+    }
+
     ob_start();
     WC_AJAX::checkout();
     $raw = ob_get_clean();
@@ -1416,14 +1427,24 @@ public function ajax_create_order_test() {
 
     if ( is_array( $decoded ) ) {
         if ( isset( $decoded['result'] ) && 'success' === $decoded['result'] ) {
-            wp_send_json_success( array( 'message' => 'order_created', 'wc' => $decoded ) );
-        } else {
-            wp_send_json_error( array( 'message' => 'checkout_failed', 'wc' => $decoded ), 400 );
+            wp_send_json_success( array(
+                'message' => 'order_created',
+                'wc'      => $decoded,
+            ) );
         }
-        return;
+
+        wp_send_json_error( array(
+            'message' => 'checkout_failed',
+            'wc'      => $decoded,
+            'notices' => wc_get_notices(),
+        ), 400 );
     }
 
-    wp_send_json_error( array( 'message' => 'invalid_response', 'raw' => $raw ), 500 );
+    wp_send_json_error( array(
+        'message' => 'invalid_response',
+        'raw'     => $raw,
+        'notices' => wc_get_notices(),
+    ), 500 );
 }
 
 /**
@@ -1590,6 +1611,25 @@ private function get_wc_notices(): array {
 		wp_send_json_success(
 			array(
 				'form' => $form_html,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: Get WooCommerce checkout nonce.
+	 *
+	 * @since 1.0.0
+	 */
+	public function ajax_get_wc_checkout_nonce() {
+		if ( ! $this->is_enabled() ) {
+			wp_send_json_error( array( 'message' => 'disabled' ), 403 );
+		}
+
+		$this->require_preview_or_classic_nonce();
+
+		wp_send_json_success(
+			array(
+				'woocommerce-process-checkout-nonce' => wp_create_nonce( 'woocommerce-process_checkout' ),
 			)
 		);
 	}

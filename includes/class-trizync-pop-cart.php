@@ -188,8 +188,6 @@ class Trizync_Pop_Cart {
 		if ( $is_classic_flow ) {
 			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_product_preview', $plugin_ajax, 'ajax_get_product_preview' );
 			$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_product_preview', $plugin_ajax, 'ajax_get_product_preview' );
-			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_update_cart_item', $plugin_ajax, 'ajax_update_cart_item' );
-			$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_update_cart_item', $plugin_ajax, 'ajax_update_cart_item' );
 			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_remove_cart_item', $plugin_ajax, 'ajax_remove_cart_item' );
 			$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_remove_cart_item', $plugin_ajax, 'ajax_remove_cart_item' );
 			$this->loader->add_action( 'wp_ajax_trizync_pop_cart_set_shipping_method', $plugin_ajax, 'ajax_set_shipping_method' );
@@ -203,6 +201,8 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'woocommerce_admin_order_data_after_billing_address', $plugin_public, 'render_admin_order_meta' );
 		$this->loader->add_action( 'woocommerce_order_data_after_billing_address', $plugin_public, 'render_admin_order_meta' );
 		$this->loader->add_action( 'woocommerce_checkout_order_processed', $plugin_public, 'handle_checkout_success', 10, 3 );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_update_cart_item', $plugin_ajax, 'ajax_update_cart_item' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_update_cart_item', $plugin_ajax, 'ajax_update_cart_item' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_prepare_product_checkout', $plugin_ajax, 'ajax_prepare_product_checkout' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_prepare_product_checkout', $plugin_ajax, 'ajax_prepare_product_checkout' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_restore_cart', $plugin_ajax, 'ajax_restore_cart' );
@@ -211,6 +211,8 @@ class Trizync_Pop_Cart {
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_notices', $plugin_ajax, 'ajax_get_notices' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_checkout_form', $plugin_ajax, 'ajax_get_checkout_form' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_checkout_form', $plugin_ajax, 'ajax_get_checkout_form' );
+		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_get_wc_checkout_nonce', $plugin_ajax, 'ajax_get_wc_checkout_nonce' );
+		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_get_wc_checkout_nonce', $plugin_ajax, 'ajax_get_wc_checkout_nonce' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_apply_coupon', $plugin_ajax, 'ajax_apply_coupon' );
 		$this->loader->add_action( 'wp_ajax_nopriv_trizync_pop_cart_apply_coupon', $plugin_ajax, 'ajax_apply_coupon' );
 		$this->loader->add_action( 'wp_ajax_trizync_pop_cart_remove_coupon', $plugin_ajax, 'ajax_remove_coupon' );
