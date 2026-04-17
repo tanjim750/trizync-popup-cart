@@ -105,6 +105,46 @@ class Trizync_Pop_Cart_Ajax extends Trizync_Pop_Cart_Public {
 	}
 
 	/**
+	 * Fire PopCart + Woo "added to cart" style hooks for custom endpoints.
+	 *
+	 * In Woo core, these hooks fire from WC_AJAX::add_to_cart(). Our custom
+	 * endpoints add to cart without going through that controller, so we
+	 * emit them manually for compatibility (fragments, analytics, 3rd parties).
+	 *
+	 * @param array  $payload Cart payload returned to the frontend.
+	 * @param int    $product_id Product id.
+	 * @param int    $quantity Quantity added.
+	 * @param int    $variation_id Variation id (optional).
+	 * @param string $cart_item_key Cart item key (optional).
+	 * @return void
+	 */
+	protected function fire_added_to_cart_hooks( $payload, $product_id, $quantity, $variation_id = 0, $cart_item_key = '' ) {
+		$product_id   = absint( $product_id );
+		$quantity     = max( 1, absint( $quantity ) );
+		$variation_id = absint( $variation_id );
+
+		/**
+		 * Plugin-level hook (PHP-side) so themes/plugins can react server-side.
+		 *
+		 * @param array  $payload
+		 * @param int    $product_id
+		 * @param int    $quantity
+		 * @param int    $variation_id
+		 * @param string $cart_item_key
+		 */
+		do_action( 'trizync_pop_cart_added_to_cart', $payload, $product_id, $quantity, $variation_id, (string) $cart_item_key );
+
+		/**
+		 * Woo compatibility hook used by many extensions.
+		 *
+		 * @param int $product_id
+		 */
+		if ( function_exists( 'do_action' ) ) {
+			do_action( 'woocommerce_ajax_added_to_cart', $product_id );
+		}
+	}
+
+	/**
 	 * Build PopCart enabled fields metadata (keys + required list).
 	 *
 	 * @since 1.0.0
@@ -745,7 +785,18 @@ public function ajax_debug_shipping_zones() {
 			$this->snapshot_cart();
 		}
 		WC()->cart->empty_cart( true );
-		WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
+		$added_key = WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
+		if ( ! $added_key ) {
+			wp_send_json_error(
+				array(
+					'message'    => 'cart_update_failed_add_to_cart',
+					'product_id' => $product_id,
+					'notices'    => $this->get_wc_notices(),
+				),
+				400
+			);
+			return;
+		}
 		WC()->cart->calculate_totals();
 
 		if ( ! $replace_cart_only && WC()->session ) {
@@ -753,7 +804,9 @@ public function ajax_debug_shipping_zones() {
 		}
 
 		$this->trigger_backend_checkout_hooks( 'prepare_product_checkout_light' );
-		wp_send_json_success( $this->build_cart_payload() );
+		$payload = $this->build_cart_payload();
+		$this->fire_added_to_cart_hooks( $payload, $product_id, $quantity, $variation_id, (string) $added_key );
+		wp_send_json_success( $payload );
 	}
 
 	/**
@@ -1958,7 +2011,18 @@ private function get_wc_notices(): array {
 			$this->snapshot_cart();
 		}
 		WC()->cart->empty_cart( true );
-		WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
+		$added_key = WC()->cart->add_to_cart( $product_id, max( 1, $quantity ), $variation_id, $attributes );
+		if ( ! $added_key ) {
+			wp_send_json_error(
+				array(
+					'message'    => 'cart_update_failed_add_to_cart',
+					'product_id' => $product_id,
+					'notices'    => $this->get_wc_notices(),
+				),
+				400
+			);
+			return;
+		}
 		WC()->cart->calculate_totals();
 
 		if ( ! $replace_cart_only && WC()->session ) {
@@ -1966,7 +2030,9 @@ private function get_wc_notices(): array {
 		}
 
 		$this->trigger_backend_checkout_hooks( 'prepare_product_checkout' );
-		wp_send_json_success( $this->build_cart_payload() );
+		$payload = $this->build_cart_payload();
+		$this->fire_added_to_cart_hooks( $payload, $product_id, $quantity, $variation_id, (string) $added_key );
+		wp_send_json_success( $payload );
 	}
 
 	/**

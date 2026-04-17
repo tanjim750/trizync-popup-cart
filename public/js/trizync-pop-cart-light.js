@@ -93,7 +93,7 @@
           : lightUiState.ui,
     };
 
-    console.log("[popcart light] updated ui state", lightUiState);
+    // console.log("[popcart light] updated ui state", lightUiState);
   }
 
   function setState(partial, source) {
@@ -110,12 +110,44 @@
       //     state: lightUiState,
       //   });
     }
-    notifySubscribers(
-      prev,
-      lightUiState,
-      getChangedKeys(prev, lightUiState),
-      source,
-    );
+    var changedKeys = getChangedKeys(prev, lightUiState);
+
+    // Keep parity with classic flow: only emit checkout lifecycle hooks for
+    // meaningful checkout-impacting updates (avoid spamming on every keystroke).
+    var skipSources = { field_input: true, fetch_wc_checkout_nonce: true };
+    var shouldEmit =
+      !skipSources[source || ""] &&
+      changedKeys &&
+      changedKeys.some(function (k) {
+        return (
+          k === "product" ||
+          k === "shipping" ||
+          k === "payment" ||
+          k === "totals" ||
+          k === "cart" ||
+          k === "coupons" ||
+          k === "context"
+        );
+      });
+
+    if (shouldEmit) {
+      emitHook("popcart:update_checkout", {
+        source: source || null,
+        partial: partial || {},
+        prev_state: prev,
+      });
+    }
+
+    notifySubscribers(prev, lightUiState, changedKeys, source);
+
+    if (shouldEmit) {
+      emitHook("popcart:updated_checkout", {
+        source: source || null,
+        changed_keys: changedKeys,
+        prev_state: prev,
+        state: lightUiState,
+      });
+    }
   }
 
   function getState() {
@@ -125,6 +157,7 @@
   function isUiFullyLoaded(state) {
     var s = state || lightUiState;
     var hasProduct = !!(s.product && s.product.product);
+    var hasCart = !!(s.cart && s.cart.items && s.cart.items.length);
     var hasShipping = !!(
       s.shipping &&
       s.shipping.methods &&
@@ -137,7 +170,13 @@
     );
     var hasFields = !!(s.fields && s.fields.length);
     var hasValues = !!(s.values && Object.keys(s.values).length);
-    return hasProduct && hasShipping && hasPayment && hasFields && hasValues;
+    return (
+      (hasProduct || hasCart) &&
+      hasShipping &&
+      hasPayment &&
+      hasFields &&
+      hasValues
+    );
   }
 
   function emitUiFullyLoaded() {
@@ -211,6 +250,20 @@
     };
   }
 
+  function decodeHtmlEntities(input) {
+    if (input === null || typeof input === "undefined") {
+      return "";
+    }
+    var str = String(input);
+    if (str.indexOf("&") === -1) {
+      return str;
+    }
+    // Decode a single layer of HTML entities (also fixes double-encoded strings like &amp;quot;).
+    var textarea = document.createElement("textarea");
+    textarea.innerHTML = str;
+    return textarea.value;
+  }
+
   var debouncedInputUpdate = debounce(function () {
     var validation = validateOrderReadinessFromState();
     if (validation.ok) {
@@ -225,12 +278,23 @@
     if (!pendingCustomerPayload) {
       return;
     }
-    updateCustomerInfo(pendingCustomerPayload);
+    var payload = pendingCustomerPayload;
+    pendingCustomerPayload = null;
+
+    updateCustomerInfo(payload)
+      .done(function (response) {
+        if (response && response.success && response.data) {
+          applyCartStateFromResponse(response, "customer_update");
+        }
+      })
+      .fail(function () {
+        // Keep silent; UI already handles errors elsewhere.
+      });
   }, 500);
 
   var debouncedCartSync = debounce(function () {
     if (lightCurrentContext) {
-      prepareCheckout(lightCurrentContext);
+      prepareCheckout(lightCurrentContext, lightUiState.coupons || []);
     }
   }, 400);
 
@@ -269,7 +333,7 @@
     }
 
     // Sections visibility based on full current state
-    if (state.product) {
+    if (state.product || (state.cart && state.cart.items && state.cart.items.length)) {
       showCartSection();
       hideEmptyCart();
     } else {
@@ -314,7 +378,9 @@
       hidePaymentSection();
     }
 
-    if (state.coupons && state.coupons.length) {
+    var storeHasCoupons =
+      !!(window.TrizyncPopCart && TrizyncPopCart.storeHasCoupons);
+    if (storeHasCoupons) {
       showCouponSection();
     } else {
       hideCouponSection();
@@ -383,6 +449,10 @@
       }
     }
 
+    if (changedKeys.indexOf("coupons") !== -1) {
+      renderCoupons(next.coupons || []);
+    }
+
     if (
       changedKeys.indexOf("product") !== -1 ||
       changedKeys.indexOf("shipping") !== -1 ||
@@ -411,14 +481,87 @@
     });
   }
 
+  function refreshFragmentsSilently(cartHash) {
+    if (!window.wc_cart_fragments_params) {
+      return;
+    }
+    var params = window.wc_cart_fragments_params;
+    var url = params.wc_ajax_url
+      ? params.wc_ajax_url.toString().replace("%%endpoint%%", "get_refreshed_fragments")
+      : "";
+    if (!url) {
+      return;
+    }
+
+    $.ajax({
+      type: "POST",
+      url: url,
+      success: function (data) {
+        if (data && data.fragments) {
+          $.each(data.fragments, function (key, value) {
+            $(key).replaceWith(value);
+          });
+          try {
+            if (window.sessionStorage && params.fragment_name) {
+              sessionStorage.setItem(
+                params.fragment_name,
+                JSON.stringify(data.fragments),
+              );
+              if (cartHash) {
+                sessionStorage.setItem("wc_cart_hash", cartHash);
+              }
+            }
+          } catch (e) {}
+          $(document.body).trigger("wc_fragments_refreshed");
+        }
+      },
+    });
+  }
+
+  function triggerAddedToCart(payload) {
+    var cartHash = payload && payload.hash ? payload.hash : "";
+    refreshFragmentsSilently(cartHash);
+
+    // Classic compatibility event.
+    $(document.body).trigger("trizync_pop_cart_added_to_cart", [payload || {}]);
+
+    // PopCart lifecycle hook (light + classic scripts can use it too).
+    emitHook("popcart:added_to_cart", { cart: payload || {} });
+  }
+
   function applyCartStateFromResponse(response, source) {
     if (response && response.success && response.data) {
+      var src = source || "cart_update";
+      var prevHash =
+        (lightUiState && lightUiState.cart && lightUiState.cart.hash) ||
+        (window.TrizyncPopCart && TrizyncPopCart.cartHash) ||
+        "";
+      var prevCount =
+        (lightUiState &&
+          lightUiState.cart &&
+          (lightUiState.cart.itemCount ||
+            lightUiState.cart.items_count ||
+            lightUiState.cart.count ||
+            lightUiState.cart.qty_total)) ||
+        0;
+
       var cart = response.data;
+      var nextCount =
+        (cart &&
+          (cart.itemCount || cart.items_count || cart.count || cart.qty_total)) ||
+        (cart && Array.isArray(cart.items) ? cart.items.length : 0);
       var existingShipping = (lightUiState && lightUiState.shipping) || {
         methods: [],
       };
+      var nextCoupons =
+        cart && Array.isArray(cart.coupons) ? cart.coupons : lightUiState.coupons;
+      var nextPayment =
+        cart && cart.payment ? cart.payment : (lightUiState && lightUiState.payment) || null;
       var nextShipping = {
-        methods: existingShipping.methods || [],
+        methods:
+          cart && cart.shipping && Array.isArray(cart.shipping.methods) && cart.shipping.methods.length
+            ? cart.shipping.methods
+            : existingShipping.methods || [],
         chosen: cart.shipping ? cart.shipping.chosen : existingShipping.chosen,
         total: cart.shipping ? cart.shipping.total : existingShipping.total,
         total_raw: cart.shipping
@@ -434,11 +577,33 @@
         shipping: nextShipping,
       });
       setState(
-        { cart: cart, shipping: nextShipping, totals: nextTotals },
-        "set_shipping_method",
+        {
+          cart: cart,
+          shipping: nextShipping,
+          totals: nextTotals,
+          coupons: nextCoupons || [],
+          payment: nextPayment,
+        },
+        src,
       );
+
+      // Only fire "added to cart" lifecycle for endpoints that actually add/replace
+      // the cart item (avoid firing on generic cart updates like coupons/shipping).
+      var isPrepareSource =
+        src === "light_prepare_checkout" ||
+        src === "prepare_product_checkout" ||
+        src === "prepare_product_checkout_light";
+      var hashChanged = !!(cart && cart.hash && cart.hash !== prevHash);
+      var becameNonEmpty = prevCount <= 0 && nextCount > 0;
+
+      if (isPrepareSource && (hashChanged || becameNonEmpty)) {
+        if (window.TrizyncPopCart) {
+          TrizyncPopCart.cartHash = cart.hash;
+        }
+        triggerAddedToCart(cart);
+      }
     } else {
-      if (rollback) {
+      if (typeof rollback !== "undefined" && rollback) {
         setState(rollback, source + "_failed");
       }
       renderErrorMessage("Sorry, unable to update cart state.");
@@ -460,7 +625,23 @@
       return [];
     }
     if (Array.isArray(coupons)) {
-      return coupons;
+      return coupons
+        .map(function (item) {
+          if (!item) {
+            return "";
+          }
+          if (typeof item === "string") {
+            return item;
+          }
+          if (typeof item === "object" && item.code) {
+            return String(item.code);
+          }
+          return "";
+        })
+        .map(function (code) {
+          return String(code || "").trim();
+        })
+        .filter(Boolean);
     }
     if (typeof coupons === "string") {
       return coupons
@@ -481,6 +662,26 @@
       return key;
     }
     return "attribute_" + key;
+  }
+
+  function normalizeVariationAttributeKey(key) {
+    // Prevent mismatches like `attribute_Waist` vs `attribute_waist`.
+    var normalized = normalizeAttributeKey(key || "");
+    return normalized ? normalized.toLowerCase() : "";
+  }
+
+  function normalizeVariationAttributesMap(attrs) {
+    var out = {};
+    if (!attrs || typeof attrs !== "object") {
+      return out;
+    }
+    Object.keys(attrs).forEach(function (k) {
+      var key = normalizeVariationAttributeKey(k);
+      if (key) {
+        out[key] = attrs[k];
+      }
+    });
+    return out;
   }
 
   function resolveProductContext(trigger) {
@@ -893,7 +1094,6 @@
 
   function createOrder(context, customer, coupons) {
     var ctx = normalizeContext(context);
-    var payload = customer || {};
     var shippingChosen =
       (lightUiState.shipping && lightUiState.shipping.chosen) || "";
     var paymentChosen =
@@ -917,32 +1117,7 @@
           "",
         _wp_http_referer: "/checkout/",
         trizync_pop_cart: 1,
-
-        billing_first_name: payload.billing_first_name || "",
-        billing_last_name: payload.billing_last_name || "",
-        billing_phone: payload.billing_phone || "",
-        billing_email: payload.billing_email || "",
-        billing_address_1: payload.billing_address_1 || "",
-        billing_address_2: payload.billing_address_2 || "",
-        billing_city: payload.billing_city || "",
-        billing_state: payload.billing_state || "",
-        billing_postcode: payload.billing_postcode || "",
-        billing_country: payload.billing_country || "BD",
-
-        shipping_first_name:
-          payload.shipping_first_name || payload.billing_first_name || "",
-        shipping_last_name:
-          payload.shipping_last_name || payload.billing_last_name || "",
-        shipping_address_1:
-          payload.shipping_address_1 || payload.billing_address_1 || "",
-        shipping_address_2:
-          payload.shipping_address_2 || payload.billing_address_2 || "",
-        shipping_city: payload.shipping_city || payload.billing_city || "",
-        shipping_state: payload.shipping_state || payload.billing_state || "",
-        shipping_postcode:
-          payload.shipping_postcode || payload.billing_postcode || "",
-        shipping_country:
-          payload.shipping_country || payload.billing_country || "BD",
+        ...customer
       },
       "nonce_checkout",
     );
@@ -996,8 +1171,8 @@
           var existingShipping = (lightUiState && lightUiState.shipping) || {
             methods: [],
           };
-          console.log("[popcart shipping] existingShipping", existingShipping);
-          console.log("[popcart shipping] cart.shipping", cart.shipping);
+          // console.log("[popcart shipping] existingShipping", existingShipping);
+          // console.log("[popcart shipping] cart.shipping", cart.shipping);
 
           var nextShipping = {
             methods: existingShipping.methods || [],
@@ -1010,7 +1185,7 @@
               : existingShipping.total_raw,
             zones: existingShipping.zones || [],
           };
-          console.log("[popcart shipping] nextShipping", nextShipping);
+          // console.log("[popcart shipping] nextShipping", nextShipping);
           var nextTotals = $.extend({}, lightUiState.totals || {}, {
             subtotal: cart.subtotal,
             subtotal_raw: cart.subtotal_raw,
@@ -1502,8 +1677,9 @@
     );
     selects.forEach(function (select) {
       var key = select.getAttribute("data-attribute");
-      if (key && select.value) {
-        attrs[key] = select.value;
+      var cleanKey = normalizeVariationAttributeKey(key);
+      if (cleanKey && select.value) {
+        attrs[cleanKey] = select.value;
       }
     });
     return attrs;
@@ -1513,14 +1689,70 @@
     if (!product || !product.variations || !product.variations.length) {
       return null;
     }
+    var cleanAttrs = normalizeVariationAttributesMap(attrs || {});
     return (
       product.variations.find(function (variation) {
-        var variationAttrs = variation.attributes || {};
-        return Object.keys(attrs).every(function (key) {
-          return variationAttrs[key] === attrs[key];
+        var variationAttrs = normalizeVariationAttributesMap(
+          variation && variation.attributes ? variation.attributes : {},
+        );
+        return Object.keys(cleanAttrs).every(function (key) {
+          return variationAttrs[key] === cleanAttrs[key];
         });
       }) || null
     );
+  }
+
+  function applySelectedVariationToContext(product, variation, source) {
+    if (!product || !variation) {
+      return;
+    }
+    var variationId = variation.id || 0;
+    if (!variationId) {
+      return;
+    }
+
+    // Keep these in sync so later calls (checkout, shipping, totals) use the right variation.
+    product.selected_variation_id = variationId;
+
+    if (!lightCurrentContext) {
+      lightCurrentContext = {
+        productId: product.id || 0,
+        qty: 1,
+        variationId: variationId,
+        attributes: {},
+      };
+    }
+
+    lightCurrentContext.productId = product.id || lightCurrentContext.productId;
+    lightCurrentContext.variationId = variationId;
+    // Always trust variation.attributes (it uses the exact keys Woo expects).
+    lightCurrentContext.attributes = normalizeVariationAttributesMap(
+      variation.attributes || {},
+    );
+
+    setState(
+      { context: normalizeContext(lightCurrentContext) },
+      source || "variation_change",
+    );
+    refreshCtaState();
+
+    // Rebuild cart/checkout calculations for the selected variation.
+    setOverlayLoading(true);
+    prepareCheckout(lightCurrentContext, lightUiState.coupons || [])
+      .always(function () {
+        setOverlayLoading(false);
+      });
+
+    // Refresh product preview so Woo notices like "choose options" disappear.
+    getProductInfo(lightCurrentContext, lightUiState.coupons || [])
+      .done(function (response) {
+        if (response && response.success && response.data) {
+          setState({ product: response.data }, "variation_preview");
+        }
+      })
+      .always(function () {
+        refreshCtaState();
+      });
   }
 
   function updatePreviewFromVariation(variation, product) {
@@ -1632,6 +1864,84 @@
     hideSection("[data-trizync-pop-cart-coupon]");
   }
 
+  function clearCouponError() {
+    var popup = getPopup();
+    if (!popup) {
+      return;
+    }
+    var error = popup.querySelector("[data-trizync-pop-cart-coupon-error]");
+    if (!error) {
+      return;
+    }
+    error.hidden = true;
+    error.textContent = "";
+  }
+
+  function showCouponError(message) {
+    var popup = getPopup();
+    if (!popup) {
+      return;
+    }
+    var error = popup.querySelector("[data-trizync-pop-cart-coupon-error]");
+    if (!error) {
+      return;
+    }
+    error.textContent = decodeHtmlEntities(message || "Unable to apply coupon.");
+    error.hidden = false;
+  }
+
+  function renderCoupons(coupons) {
+    var popup = getPopup();
+    if (!popup) {
+      return;
+    }
+    var wrap = popup.querySelector("[data-trizync-pop-cart-coupon]");
+    var list = popup.querySelector("[data-trizync-pop-cart-coupon-list]");
+    if (!wrap || !list) {
+      return;
+    }
+    list.innerHTML = "";
+    clearCouponError();
+
+    // Visibility is store-driven; list rendering is customer-driven.
+    var storeHasCoupons =
+      !!(window.TrizyncPopCart && TrizyncPopCart.storeHasCoupons);
+    if (!storeHasCoupons) {
+      hideCouponSection();
+      return;
+    }
+    showCouponSection();
+
+    if (!coupons || !coupons.length) {
+      return;
+    }
+
+    coupons.forEach(function (coupon) {
+      var row = document.createElement("div");
+      row.className = "trizync-pop-cart__coupon-item";
+
+      var code = document.createElement("span");
+      code.className = "trizync-pop-cart__coupon-code";
+      code.textContent = coupon.code || "";
+
+      var amount = document.createElement("span");
+      amount.className = "trizync-pop-cart__coupon-amount";
+      amount.innerHTML = coupon.amount || "";
+
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "trizync-pop-cart__coupon-remove";
+      remove.textContent = "×";
+      remove.setAttribute("data-trizync-pop-cart-coupon-remove", "");
+      remove.setAttribute("data-coupon-code", coupon.code || "");
+
+      row.appendChild(code);
+      row.appendChild(amount);
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+  }
+
   function showShippingSection() {
     showSection("[data-trizync-pop-cart-shipping]");
   }
@@ -1681,9 +1991,22 @@
 
     empty.hidden = true;
 
-    var chosenId = shipping.chosen || "";
+    // Source of truth: shipping.chosen (if provided). Otherwise fall back to
+    // server-provided `method.selected`, then previous state, then first method.
+    var chosenId = (shipping && shipping.chosen) || "";
+    if (!chosenId && shipping && Array.isArray(shipping.methods)) {
+      var selected = shipping.methods.find(function (m) {
+        return !!(m && m.selected);
+      });
+      if (selected && selected.id) {
+        chosenId = selected.id;
+      }
+    }
     if (!chosenId && lightUiState.shipping && lightUiState.shipping.chosen) {
       chosenId = lightUiState.shipping.chosen;
+    }
+    if (!chosenId && shipping && shipping.methods && shipping.methods[0]) {
+      chosenId = shipping.methods[0].id || "";
     }
 
     shipping.methods.forEach(function (method) {
@@ -1697,9 +2020,9 @@
       if (typeof method.price_raw !== "undefined") {
         input.setAttribute("data-price-raw", method.price_raw);
       }
-      if (method.selected || (chosenId && method.id === chosenId)) {
-        input.checked = true;
-      }
+      input.checked = !!(chosenId && method.id === chosenId);
+      // Keep selected flag consistent (helpful for downstream code).
+      method.selected = input.checked;
 
       var meta = document.createElement("span");
       meta.className = "trizync-pop-cart__shipping-meta";
@@ -1718,22 +2041,21 @@
       list.appendChild(option);
     });
 
-    if (!shipping.chosen && chosenId) {
-      shipping.chosen = chosenId;
-    }
+    // Normalize chosen id.
+    shipping.chosen = chosenId || "";
 
     if (hiddenInput) {
-      hiddenInput.value = shipping.chosen || "";
+      hiddenInput.value = chosenId || "";
     }
 
     if (
       shipping &&
-      shipping.chosen &&
+      chosenId &&
       shipping.methods &&
       shipping.methods.length
     ) {
       var chosenMethod = shipping.methods.find(function (method) {
-        return method.id === shipping.chosen;
+        return method.id === chosenId;
       });
       if (chosenMethod) {
         mergeUiState({ shipping: shipping });
@@ -1812,9 +2134,9 @@
 
   function updateSubtotals(payload) {
     var popup = getPopup();
-    console.log("Attempting to update subtotals.");
+    // console.log("Attempting to update subtotals.");
     if (!popup) {
-      console.log("Popup not found, cannot update subtotals.");
+      // console.log("Popup not found, cannot update subtotals.");
       return;
     }
     var totals = popup.querySelector("[data-trizync-pop-cart-totals]");
@@ -1827,14 +2149,14 @@
       "[data-trizync-pop-cart-shipping-total]",
     );
 
-    console.log("Updating subtotals with payload:", payload);
-    console.log("Found elements:", {
-      totals,
-      subtotal,
-      total,
-      shippingRow,
-      shippingTotal,
-    });
+    // console.log("Updating subtotals with payload:", payload);
+    // console.log("Found elements:", {
+    //   totals,
+    //   subtotal,
+    //   total,
+    //   shippingRow,
+    //   shippingTotal,
+    // });
     if (!totals || !subtotal || !total || !shippingRow || !shippingTotal) {
       return;
     }
@@ -1955,7 +2277,7 @@
   }
 
   function renderNoticesHtml(html) {
-    console.log("Rendering notices with HTML:", html);
+    // console.log("Rendering notices with HTML:", html);
     var popup = getPopup();
     if (!popup) {
       return;
@@ -2216,8 +2538,27 @@
   function validateOrderReadinessFromState() {
     var errors = [];
 
-    if (!lightUiState.product || !lightUiState.product.product) {
-      errors.push({ key: "product", message: "Missing product" });
+    var popupType =
+      (lightUiState.meta && lightUiState.meta.popup_type) || "product";
+    if (popupType === "cart") {
+      if (!lightUiState.cart || !lightUiState.cart.items || !lightUiState.cart.items.length) {
+        errors.push({ key: "cart", message: "Cart is empty" });
+      }
+    } else {
+      if (!lightUiState.product || !lightUiState.product.product) {
+        errors.push({ key: "product", message: "Missing product" });
+      }
+    }
+
+    if (
+      lightUiState.product &&
+      lightUiState.product.product &&
+      lightUiState.product.product.type === "variable"
+    ) {
+      var ctx = getCheckoutContextFromState();
+      if (!ctx || !ctx.variation_id) {
+        errors.push({ key: "variation", message: "Missing variation" });
+      }
     }
 
     if (
@@ -2269,7 +2610,7 @@
   }
 
   function getCheckoutContextFromState() {
-    console.log("Getting checkout context from state:", lightUiState);
+    // console.log("Getting checkout context from state:", lightUiState);
     if (lightUiState.context) {
       return normalizeContext(lightUiState.context);
     }
@@ -2335,15 +2676,18 @@
 
   function wireCtaSubmit() {
     $(document).on("click", ".trizync-pop-cart__cta", function (event) {
+      emitHook("popcart:checkout:attempt", {});
       var validation = validateOrderReadinessFromState();
       if (!validation.ok) {
         event.preventDefault();
+        emitHook("popcart:checkout:blocked", { errors: validation.errors });
         return;
       }
       var payload = collectCustomerPayload();
       var context = getCheckoutContextFromState();
       disableCta();
       updateCustomerInfo(payload).always(function () {
+        emitHook("popcart:checkout:submit", {});
         createOrder(context, payload, lightUiState.coupons || [])
           .done(function (response) {
             if (
@@ -2351,10 +2695,23 @@
               response.result === "success" &&
               response.redirect
             ) {
+              emitHook("popcart:checkout:success", {
+                redirect: response.redirect,
+                order_id: response.order_id || null,
+                response: response,
+              });
               window.location.href = response.redirect;
               return;
             }
             if (response && response.result === "failure") {
+              emitHook("popcart:checkout_error", {
+                messages: response.messages || "",
+                response: response,
+              });
+              emitHook("popcart:checkout:error", {
+                messages: response.messages || "",
+                response: response,
+              });
               if (typeof response.messages === "string") {
                 renderNoticesHtml(response.messages);
               } else {
@@ -2379,12 +2736,22 @@
                 });
               }
             } else {
+              emitHook("popcart:checkout_error", { response: response || null });
+              emitHook("popcart:checkout:error", { response: response || null });
               renderErrorMessage("Unable to place order.");
             }
             enableCta();
           })
           .fail(function (xhr) {
             var res = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+            emitHook("popcart:checkout_error", {
+              xhr: xhr || null,
+              response: res || null,
+            });
+            emitHook("popcart:checkout:error", {
+              xhr: xhr || null,
+              response: res || null,
+            });
             if (
               res &&
               res.result === "failure" &&
@@ -2489,49 +2856,92 @@
 
   // Lifecycle hooks start
 
-  function runCustomScript(script, data) {
-    if (!script) {
+  var popcartSessionId =
+    "pc_" + Math.random().toString(36).slice(2) + "_" + Date.now();
+
+  function getHookContext(action) {
+    return {
+      hook: action,
+      popup_type:
+        (lightUiState &&
+          lightUiState.meta &&
+          lightUiState.meta.popup_type) ||
+        "cart",
+      page_url: window.location ? window.location.href : "",
+      timestamp: new Date().toISOString(),
+      session_id: popcartSessionId,
+    };
+  }
+
+  function runHookScripts(action, data, context) {
+    if (!window.TrizyncPopCart || !TrizyncPopCart.scripts) {
+      return;
+    }
+    if (
+      typeof TrizyncPopCart.scriptsEnabled !== "undefined" &&
+      !TrizyncPopCart.scriptsEnabled
+    ) {
+      return;
+    }
+    var script = TrizyncPopCart.scripts[action];
+    if (!script || !script.trim) {
+      return;
+    }
+    var code = script.trim();
+    if (!code) {
       return;
     }
     try {
       /* eslint-disable no-new-func */
-      var fn = new Function("data", script);
-      fn(data);
+      new Function("data", "context", code)(data, context);
       /* eslint-enable no-new-func */
     } catch (err) {
-      // Silent for light flow; UI can opt-in to error handling.
+      // Keep light flow silent by default (classic shows script errors in UI).
     }
   }
 
-  function emitHook(action, data) {
-    var payload = $.extend({ action: action }, data || {});
-    $(document).trigger(action, payload);
-    if (
-      window.TrizyncPopCart &&
-      TrizyncPopCart.scripts &&
-      TrizyncPopCart.scriptsEnabled
-    ) {
-      runCustomScript(TrizyncPopCart.scripts[action], payload);
+  function buildHookPayload(action, extra) {
+    var payload = $.extend({}, extra || {});
+    payload.action = action;
+    payload.timestamp = new Date().toISOString();
+    payload.popup_type =
+      (lightUiState && lightUiState.meta && lightUiState.meta.popup_type) ||
+      "cart";
+    payload.page_url = window.location ? window.location.href : "";
+    payload.selection = {
+      context: lightUiState && lightUiState.context ? lightUiState.context : {},
+      shipping:
+        lightUiState && lightUiState.shipping ? lightUiState.shipping.chosen : "",
+      payment:
+        lightUiState && lightUiState.payment ? lightUiState.payment.chosen : "",
+      coupons: normalizeCoupons(lightUiState ? lightUiState.coupons : []),
+      values: lightUiState && lightUiState.values ? lightUiState.values : {},
+    };
+    if (!payload.meta) {
+      payload.meta = {};
     }
+    if (!payload.meta.session_id) {
+      payload.meta.session_id = popcartSessionId;
+    }
+    return payload;
+  }
+
+  function emitHook(action, data) {
+    var context = getHookContext(action);
+    var payload = buildHookPayload(action, data || {});
+
+    // Trigger from document.body so listeners on either `document.body` or
+    // `document` receive it (bubbling), without double-triggering.
+    if (typeof jQuery !== "undefined") {
+      jQuery(document.body).trigger(action, [payload, context]);
+    }
+
+    // Admin-injected scripts (Settings > Scripts).
+    runHookScripts(action, payload, context);
   }
 
   function initLifecycleHooks() {
     emitHook("popcart:boot", {});
-
-    $(document).on("click", "[data-trizync-pop-cart-open]", function () {
-      emitHook("popcart:open:start", {});
-      emitHook("popcart:init_checkout", {});
-      emitHook("popcart:woocommerce_before_checkout_form", {});
-      emitHook("popcart:woocommerce_checkout_before_customer_details", {});
-      emitHook("popcart:woocommerce_checkout_billing", {});
-      emitHook("popcart:woocommerce_checkout_shipping", {});
-      emitHook("popcart:woocommerce_checkout_after_customer_details", {});
-      emitHook("popcart:woocommerce_after_checkout_form", {});
-    });
-
-    $(document).on("click", ".trizync-pop-cart__cta", function () {
-      emitHook("popcart:checkout:attempt", {});
-    });
   }
 
   // Lifecycle hooks end
@@ -2553,6 +2963,20 @@
       },
       "openPopupFlow",
     );
+
+    // Light flow is custom UI; emit Woo-style lifecycle hooks manually (classic parity).
+    emitHook("popcart:open:start", {});
+    emitHook("popcart:init_checkout", {});
+    emitHook("popcart:woocommerce_before_checkout_form", {});
+    emitHook("popcart:woocommerce_checkout_before_customer_details", {});
+    emitHook("popcart:woocommerce_checkout_billing", {});
+    emitHook("popcart:woocommerce_checkout_shipping", {});
+    emitHook("popcart:woocommerce_checkout_after_customer_details", {});
+    emitHook("popcart:woocommerce_checkout_before_order_review", {});
+    emitHook("popcart:woocommerce_checkout_order_review", {});
+    emitHook("popcart:woocommerce_checkout_after_order_review", {});
+    emitHook("popcart:woocommerce_after_checkout_form", {});
+
     hideEmptyCart();
     hideCartSection();
     hideShippingSection();
@@ -2571,7 +2995,7 @@
     wireFieldSync();
     wireCtaSubmit();
 
-    getProductInfo(context)
+    getProductInfo(context, lightUiState.coupons || [])
       .done(function (response) {
         if (response && response.success) {
           setState(
@@ -2580,10 +3004,21 @@
               totals: response.data,
               shipping: response.data.shipping || null,
               payment: response.data.payment || null,
-              coupons: response.data.coupons || null,
+              coupons: response.data.coupons || [],
             },
             "product_preview",
           );
+
+          // Ensure subtotal/total reflect applied coupons.
+          getSubtotal(context, response.data.coupons || [])
+            .done(function (sub) {
+              if (sub && sub.success && sub.data) {
+                setState({ totals: sub.data }, "subtotal");
+              }
+            })
+            .fail(function () {
+              // ignore subtotal failure; product preview already includes totals
+            });
         } else {
           renderErrorMessage(
             response && response.data && response.data.message
@@ -2634,20 +3069,12 @@
         // keep enabled list if applied lookup fails
       });
 
-    getSubtotal(context)
-      .done(function (response) {
-        if (response && response.success && response.data) {
-          setState({ totals: response.data }, "subtotal");
-        }
-      })
-      .fail(function () {
-        renderErrorMessage("Unable to calculate totals.");
-      });
+    // Subtotal is now calculated after product preview so coupons are respected.
 
-    setTimeout(
-      () => console.log("current state at end of openPopupFlow:", getState()),
-      5000,
-    );
+    // setTimeout(
+    //   () => console.log("current state at end of openPopupFlow:", getState()),
+    //   5000,
+    // );
   }
 
   function openCartPopupFlow(trigger) {
@@ -2668,6 +3095,18 @@
       "openCartPopupFlow",
     );
 
+    emitHook("popcart:open:start", {});
+    emitHook("popcart:init_checkout", {});
+    emitHook("popcart:woocommerce_before_checkout_form", {});
+    emitHook("popcart:woocommerce_checkout_before_customer_details", {});
+    emitHook("popcart:woocommerce_checkout_billing", {});
+    emitHook("popcart:woocommerce_checkout_shipping", {});
+    emitHook("popcart:woocommerce_checkout_after_customer_details", {});
+    emitHook("popcart:woocommerce_checkout_before_order_review", {});
+    emitHook("popcart:woocommerce_checkout_order_review", {});
+    emitHook("popcart:woocommerce_checkout_after_order_review", {});
+    emitHook("popcart:woocommerce_after_checkout_form", {});
+
     hideEmptyCart();
     hideCartSection();
     hideShippingSection();
@@ -2682,6 +3121,7 @@
     warmSession().always(function () {
       setOverlayLoading(false);
     });
+    fetchWooCheckoutNonce();
     wireLightCheckoutFields();
     wireFieldSync();
     wireCtaSubmit();
@@ -2698,7 +3138,7 @@
               shipping: response.data.shipping || null,
               payment: response.data.payment || null,
               totals: response.data,
-              coupons: response.data.coupons || null,
+              coupons: response.data.coupons || [],
             },
             "cart_payload",
           );
@@ -2726,7 +3166,7 @@
       }
       //   renderDummyPreviewSequence();
     }
-    console.log("Open popup click triggered:", trigger);
+    // console.log("Open popup click triggered:", trigger);
   });
 
   var checkoutSelectors = [
@@ -2887,8 +3327,127 @@
 
   $(document).on("click", "[data-trizync-pop-cart-close]", function (event) {
     event.preventDefault();
+    emitHook("popcart:close", {});
     closePopup();
+    emitHook("popcart:cleanup", { cart_restored: null });
   });
+
+  $(document).on(
+    "click",
+    "[data-trizync-pop-cart-coupon-apply]",
+    function () {
+      clearCouponError();
+      var popup = getPopup();
+      if (!popup) {
+        return;
+      }
+      var input = popup.querySelector("[data-trizync-pop-cart-coupon-input]");
+      if (!input) {
+        return;
+      }
+      var code = (input.value || "").trim();
+      if (!code) {
+        showCouponError("Please enter a coupon code.");
+        return;
+      }
+
+      var ctx = getCheckoutContextFromState();
+      setOverlayLoading(true);
+      applyCoupon(code, ctx)
+        .done(function (response) {
+          if (response && response.success && response.data) {
+            applyCartStateFromResponse(response, "apply_coupon");
+            input.value = "";
+            // Keep product preview consistent with applied coupons.
+            if (lightCurrentContext) {
+              getProductInfo(lightCurrentContext, response.data.coupons || [])
+                .done(function (r) {
+                  if (r && r.success && r.data) {
+                    setState({ product: r.data }, "coupon_preview");
+                  }
+                })
+                .always(function () {
+                  refreshCtaState();
+                });
+            }
+          } else if (response && response.data && response.data.message) {
+            showCouponError(response.data.message);
+          } else {
+            showCouponError("Unable to apply coupon.");
+          }
+        })
+        .fail(function (xhr) {
+          var message = "Unable to apply coupon.";
+          if (
+            xhr &&
+            xhr.responseJSON &&
+            xhr.responseJSON.data &&
+            xhr.responseJSON.data.message
+          ) {
+            message = xhr.responseJSON.data.message;
+          }
+          showCouponError(message);
+        })
+        .always(function () {
+          setOverlayLoading(false);
+        });
+    },
+  );
+
+  $(document).on(
+    "keydown",
+    "[data-trizync-pop-cart-coupon-input]",
+    function (event) {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      var popup = getPopup();
+      if (!popup) {
+        return;
+      }
+      var applyBtn = popup.querySelector(
+        "[data-trizync-pop-cart-coupon-apply]",
+      );
+      if (applyBtn) {
+        applyBtn.click();
+      }
+    },
+  );
+
+  $(document).on(
+    "click",
+    "[data-trizync-pop-cart-coupon-remove]",
+    function () {
+      clearCouponError();
+      var code = this.getAttribute("data-coupon-code") || "";
+      if (!code) {
+        return;
+      }
+      var ctx = getCheckoutContextFromState();
+      setOverlayLoading(true);
+      removeCoupon(code, ctx)
+        .done(function (response) {
+          if (response && response.success && response.data) {
+            applyCartStateFromResponse(response, "remove_coupon");
+            if (lightCurrentContext) {
+              getProductInfo(lightCurrentContext, response.data.coupons || [])
+                .done(function (r) {
+                  if (r && r.success && r.data) {
+                    setState({ product: r.data }, "coupon_preview_remove");
+                  }
+                })
+                .always(function () {
+                  refreshCtaState();
+                });
+            }
+          }
+        })
+        .always(function () {
+          setOverlayLoading(false);
+        });
+    },
+  );
 
   $(document).on(
     "change",
@@ -2899,7 +3458,26 @@
       }
       var attrs = collectVariationAttributes();
       var match = findMatchingVariation(lightCurrentPayload.product, attrs);
-      updatePreviewFromVariation(match, lightCurrentPayload.product);
+      if (match) {
+        applySelectedVariationToContext(
+          lightCurrentPayload.product,
+          match,
+          "variation_select",
+        );
+      } else {
+        // Not a complete/valid combination yet.
+        lightCurrentPayload.product.selected_variation_id = 0;
+        if (lightCurrentContext) {
+          lightCurrentContext.variationId = 0;
+          lightCurrentContext.attributes = normalizeVariationAttributesMap(attrs);
+          setState(
+            { context: normalizeContext(lightCurrentContext) },
+            "variation_select_incomplete",
+          );
+          refreshCtaState();
+        }
+        updatePreviewFromVariation(null, lightCurrentPayload.product);
+      }
     },
   );
 
@@ -2934,7 +3512,15 @@
           return variation.id === variationId;
         },
       );
-      updatePreviewFromVariation(match, lightCurrentPayload.product);
+      if (match) {
+        applySelectedVariationToContext(
+          lightCurrentPayload.product,
+          match,
+          "variation_click",
+        );
+      } else {
+        updatePreviewFromVariation(null, lightCurrentPayload.product);
+      }
     },
   );
 
@@ -2985,7 +3571,7 @@
       }
 
       if (lightCurrentContext) {
-        getProductInfo(lightCurrentContext)
+        getProductInfo(lightCurrentContext, lightUiState.coupons || [])
           .done(function (response) {
             if (response && response.success) {
               setState({ product: response.data }, "qty_product_preview");
@@ -2995,7 +3581,7 @@
             // keep UI as-is if update fails
           });
 
-        getSubtotal(lightCurrentContext)
+        getSubtotal(lightCurrentContext, lightUiState.coupons || [])
           .done(function (response) {
             if (response && response.success && response.data) {
               setState({ totals: response.data }, "qty_subtotal");

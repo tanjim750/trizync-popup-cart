@@ -132,6 +132,9 @@ class Trizync_Pop_Cart_Public {
 				'cartHash' => function_exists( 'WC' ) && WC()->cart ? WC()->cart->get_cart_hash() : '',
 				'currency' => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
 				'flowMode' => $flow_mode,
+				'storeHasCoupons' => ( function_exists( 'wc_coupons_enabled' ) && wc_coupons_enabled() && function_exists( 'wp_count_posts' ) )
+					? ( (int) ( wp_count_posts( 'shop_coupon' )->publish ?? 0 ) > 0 )
+					: false,
 				'scripts'  => $this->get_scripts_settings(),
 				'scriptsEnabled' => (bool) (int) get_option( TRIZYNC_POP_CART_OPTION_SCRIPTS_ENABLED, 1 ),
 				'replaceAddToCart' => $this->is_replace_add_to_cart_enabled(),
@@ -586,6 +589,7 @@ class Trizync_Pop_Cart_Public {
 		return array(
 			'popcart:boot',
 			'popcart:open:start',
+			'popcart:added_to_cart',
 			'popcart:checkout:attempt',
 			'popcart:checkout:blocked',
 			'popcart:checkout:submit',

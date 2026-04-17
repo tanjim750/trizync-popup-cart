@@ -692,6 +692,61 @@
 	white-space: nowrap;
 }
 
+#trizync-pop-cart .trizync-pop-cart__coupon {
+	margin-top: 14px;
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-form {
+	margin-top: 8px;
+	margin-bottom: 8px;
+	align-items: stretch;
+	flex-wrap: nowrap;
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-input {
+	height: 42px;
+	border: 1px solid rgba(var(--trizync-primary-rgb), 0.18) !important;
+	border-radius: 12px !important;
+	padding: 0 12px !important;
+	font-size: 14px !important;
+	background: #ffffff !important;
+	color: #1f1f1f !important;
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-apply {
+	height: 42px;
+	padding: 0 14px !important;
+	border-radius: 12px !important;
+	font-weight: 800 !important;
+	font-size: 13px !important;
+	letter-spacing: 0.02em;
+	color: #151515 !important;
+	background-color: #090808 !important;
+	box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18) !important;
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-apply:hover {
+	filter: brightness(1.03);
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-apply:active {
+	transform: translateY(1px);
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-error {
+	margin: 8px 0 0 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: #b91c1c;
+}
+
+#trizync-pop-cart .trizync-pop-cart__coupon-list {
+	margin-top: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
 #trizync-pop-cart {
 	font-family: "Poppins", "Inter", "Segoe UI", sans-serif;
 	line-height: 1.5;
@@ -793,6 +848,12 @@
 	-webkit-appearance: none !important;
 	border: none !important;
 	background: none !important;
+}
+
+/* Override the shared "background: none" reset above for the coupon apply button. */
+#trizync-pop-cart .trizync-pop-cart__coupon-apply {
+	background: #000000 !important;
+	color: #ffffff !important;
 }
 
 #trizync-pop-cart .trizync-pop-cart__cta {

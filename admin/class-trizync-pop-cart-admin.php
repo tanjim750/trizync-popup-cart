@@ -949,6 +949,7 @@ class Trizync_Pop_Cart_Admin {
 		return array(
 			'popcart:boot',
 			'popcart:open:start',
+			'popcart:added_to_cart',
 			'popcart:checkout:attempt',
 			'popcart:checkout:blocked',
 			'popcart:checkout:submit',

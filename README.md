@@ -72,6 +72,7 @@ Use these hook names in the Custom Scripts dropdown:
 - `popcart:checkout:success`
 - `popcart:close`
 - `popcart:cleanup`
+- `popcart:added_to_cart`
 - `popcart:init_checkout`
 - `popcart:updated_checkout`
 - `popcart:update_checkout`
