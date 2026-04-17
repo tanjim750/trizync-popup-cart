@@ -539,6 +539,44 @@ class Trizync_Pop_Cart_Admin {
 		if ( ! is_array( $fields ) ) {
 			$fields = $this->get_default_fields();
 		}
+
+		// Back-compat: if older configs still have the old default label/placeholder for billing_first_name,
+		// update it in the UI (it will be persisted when settings are saved).
+		$old_first_label = __( 'Full Name', 'trizync-pop-cart' );
+		$new_first_label = __( 'First Name', 'trizync-pop-cart' );
+		$old_first_ph    = __( 'Your full name', 'trizync-pop-cart' );
+		$new_first_ph    = __( 'Your first name', 'trizync-pop-cart' );
+		foreach ( $fields as &$field ) {
+			if ( empty( $field['key'] ) || 'billing_first_name' !== (string) $field['key'] ) {
+				continue;
+			}
+			if ( empty( $field['label'] ) || $old_first_label === (string) $field['label'] ) {
+				$field['label'] = $new_first_label;
+			}
+			if ( empty( $field['placeholder'] ) || $old_first_ph === (string) $field['placeholder'] ) {
+				$field['placeholder'] = $new_first_ph;
+			}
+		}
+		unset( $field );
+
+		// Backfill any new default fields into existing saved configs (UI only; saved on submit).
+		$defaults = $this->get_default_fields();
+		$existing_keys = array();
+		foreach ( $fields as $field ) {
+			if ( isset( $field['key'] ) ) {
+				$existing_keys[ (string) $field['key'] ] = true;
+			}
+		}
+		foreach ( $defaults as $def ) {
+			$def_key = isset( $def['key'] ) ? (string) $def['key'] : '';
+			if ( '' === $def_key ) {
+				continue;
+			}
+			if ( isset( $existing_keys[ $def_key ] ) ) {
+				continue;
+			}
+			$fields[] = $def;
+		}
 		?>
 		<div class="trizync-pop-cart-fields" data-fields-manager data-default-keys="<?php echo esc_attr( wp_json_encode( wp_list_pluck( $this->get_default_fields(), 'key' ) ) ); ?>">
 			<input type="hidden" name="<?php echo esc_attr( TRIZYNC_POP_CART_OPTION_FIELDS ); ?>" value="<?php echo esc_attr( wp_json_encode( $fields ) ); ?>" data-fields-value>
@@ -821,14 +859,25 @@ class Trizync_Pop_Cart_Admin {
 		return array(
 			array(
 				'key'         => 'billing_first_name',
-				'label'       => __( 'Full Name', 'trizync-pop-cart' ),
-				'placeholder' => __( 'Your full name', 'trizync-pop-cart' ),
+				'label'       => __( 'First Name', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Your first name', 'trizync-pop-cart' ),
 				'default'     => '',
 				'type'        => 'text',
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 1,
 				'order'       => 1,
+			),
+			array(
+				'key'         => 'billing_last_name',
+				'label'       => __( 'Last Name', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Your last name', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'required',
+				'enabled'     => 0,
+				'order'       => 2,
 			),
 			array(
 				'key'         => 'billing_phone',
@@ -839,7 +888,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 1,
-				'order'       => 2,
+				'order'       => 3,
 			),
 			array(
 				'key'         => 'billing_email',
@@ -850,7 +899,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 1,
-				'order'       => 3,
+				'order'       => 4,
 			),
 			array(
 				'key'         => 'billing_address_1',
@@ -861,7 +910,18 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 1,
-				'order'       => 4,
+				'order'       => 5,
+			),
+			array(
+				'key'         => 'billing_address_2',
+				'label'       => __( 'Address line 2', 'trizync-pop-cart' ),
+				'placeholder' => __( 'Apartment, suite, unit, etc. (optional)', 'trizync-pop-cart' ),
+				'default'     => '',
+				'type'        => 'text',
+				'options'     => array(),
+				'rule'        => 'optional',
+				'enabled'     => 0,
+				'order'       => 6,
 			),
 			array(
 				'key'         => 'billing_city',
@@ -872,7 +932,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 0,
-				'order'       => 5,
+				'order'       => 7,
 			),
 			array(
 				'key'         => 'billing_postcode',
@@ -883,7 +943,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 0,
-				'order'       => 6,
+				'order'       => 8,
 			),
 			array(
 				'key'         => 'billing_country',
@@ -894,7 +954,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 0,
-				'order'       => 7,
+				'order'       => 9,
 			),
 			array(
 				'key'         => 'billing_state',
@@ -905,7 +965,7 @@ class Trizync_Pop_Cart_Admin {
 				'options'     => array(),
 				'rule'        => 'required',
 				'enabled'     => 0,
-				'order'       => 8,
+				'order'       => 10,
 			),
 		);
 	}

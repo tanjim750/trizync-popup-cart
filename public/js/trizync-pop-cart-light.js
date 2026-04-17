@@ -11,6 +11,7 @@
   var lightCurrentPayload = null;
   var lastSubtotalPayload = null;
   var lightCurrentContext = null;
+  var noticesClearTimer = null;
 
   var lightUiState = {
     product: null,
@@ -293,9 +294,22 @@
   }, 500);
 
   var debouncedCartSync = debounce(function () {
-    if (lightCurrentContext) {
-      prepareCheckout(lightCurrentContext, lightUiState.coupons || []);
+    if (!lightCurrentContext) {
+      return;
     }
+    // Don't call prepare checkout for variable products until a variation is selected.
+    if (
+      lightUiState &&
+      lightUiState.product &&
+      lightUiState.product.product &&
+      lightUiState.product.product.type === "variable"
+    ) {
+      var ctx = normalizeContext(lightCurrentContext);
+      if (!ctx.variation_id) {
+        return;
+      }
+    }
+    prepareCheckout(lightCurrentContext, lightUiState.coupons || []);
   }, 400);
 
   function resolvePopupType(trigger) {
@@ -1089,6 +1103,18 @@
       "nonce_checkout",
     ).done(function (response) {
       applyCartStateFromResponse(response, "light_prepare_checkout");
+    }).fail(function (xhr) {
+      var res = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+      if (res && res.data && res.data.notices && res.data.notices.length) {
+        var msg = res.data.notices[0].message || "";
+        msg = decodeHtmlEntities(msg);
+        renderErrorMessage(msg || "Unable to update cart.");
+      } else if (res && res.data && res.data.message) {
+        renderErrorMessage(res.data.message);
+      } else {
+        renderErrorMessage("Unable to update cart.");
+      }
+      disableCta();
     });
   }
 
@@ -1512,16 +1538,47 @@
       return;
     }
     list.innerHTML = "";
-    var selectedId = product.selected_variation_id || 0;
-    if (!selectedId && product.variations.length) {
-      selectedId = product.variations[0].id || 0;
+
+    function isVariationSelectable(v) {
+      // Mirror the guard in applySelectedVariationToContext().
+      return !(v && (v.is_in_stock === false || v.is_purchasable === false));
+    }
+
+    var ctx = normalizeContext(lightCurrentContext || lightUiState.context || {});
+    var ctxSelectedId = ctx && ctx.variation_id ? ctx.variation_id : 0;
+    var selectedId = ctxSelectedId || product.selected_variation_id || 0;
+    var selectedVar =
+      selectedId && product.variations
+        ? product.variations.find(function (v) {
+            return v && v.id === selectedId;
+          })
+        : null;
+
+    // If the current selection is out of stock / not purchasable, don't keep it selected.
+    if (selectedVar && !isVariationSelectable(selectedVar)) {
+      selectedId = 0;
+      selectedVar = null;
+    }
+
+    // If nothing selected yet, pick the first selectable variation (avoids "default is OOS" mismatch).
+    if (!selectedId && product.variations && product.variations.length) {
+      selectedVar = product.variations.find(isVariationSelectable) || null;
+      selectedId = selectedVar && selectedVar.id ? selectedVar.id : 0;
+    }
+
+    if (selectedId) {
       product.selected_variation_id = selectedId;
       if (lightCurrentPayload && lightCurrentPayload.product) {
         lightCurrentPayload.product.selected_variation_id = selectedId;
       }
-      if (selectedId && typeof updatePreviewFromVariation === "function") {
-        updatePreviewFromVariation(product.variations[0], product);
-      }
+    }
+
+    // Keep checkout context in sync (but avoid loops when it's already correct).
+    if (selectedId && selectedVar && (!ctxSelectedId || ctxSelectedId !== selectedId)) {
+      applySelectedVariationToContext(product, selectedVar, "variation_auto_select");
+    } else if (selectedId && selectedVar && typeof updatePreviewFromVariation === "function") {
+      // At least keep the preview consistent if we're not changing context.
+      updatePreviewFromVariation(selectedVar, product);
     }
 
     product.variations.forEach(function (variation) {
@@ -1710,6 +1767,48 @@
     if (!variationId) {
       return;
     }
+
+    function showVariationError(message) {
+      var popup = getPopup();
+      if (!popup) {
+        return;
+      }
+      var err = popup.querySelector("[data-trizync-pop-cart-variation-error]");
+      if (!err) {
+        return;
+      }
+      err.textContent = message || "Please select product options.";
+      err.hidden = false;
+    }
+
+    function hideVariationError() {
+      var popup = getPopup();
+      if (!popup) {
+        return;
+      }
+      var err = popup.querySelector("[data-trizync-pop-cart-variation-error]");
+      if (!err) {
+        return;
+      }
+      err.hidden = true;
+    }
+
+    // Fast client-side check (server will also validate).
+    if (variation.is_in_stock === false || variation.is_purchasable === false) {
+      showVariationError("Selected option is out of stock.");
+      renderErrorMessage("Selected option is out of stock.");
+      disableCta();
+      if (lightCurrentContext) {
+        lightCurrentContext.variationId = 0;
+        setState(
+          { context: normalizeContext(lightCurrentContext) },
+          "variation_out_of_stock",
+        );
+      }
+      return;
+    }
+
+    hideVariationError();
 
     // Keep these in sync so later calls (checkout, shipping, totals) use the right variation.
     product.selected_variation_id = variationId;
@@ -2257,6 +2356,19 @@
     }
   }
 
+  function scheduleNoticesAutoHide(noticesEl) {
+    if (!noticesEl) {
+      return;
+    }
+    if (noticesClearTimer) {
+      clearTimeout(noticesClearTimer);
+    }
+    noticesClearTimer = setTimeout(function () {
+      // Keep it simple: clear the notices container.
+      noticesEl.innerHTML = "";
+    }, 7000);
+  }
+
   function renderErrorMessage(message) {
     var popup = getPopup();
     if (!popup) {
@@ -2274,6 +2386,7 @@
       (message || "Something went wrong.") +
       "</span></li></ul>";
     notices.innerHTML = html;
+    scheduleNoticesAutoHide(notices);
   }
 
   function renderNoticesHtml(html) {
@@ -2329,9 +2442,7 @@
     });
     htmlOut += "</ul>";
     notices.innerHTML = htmlOut;
-    setTimeout(function () {
-      notices.innerHTML = "";
-    }, 6000);
+    scheduleNoticesAutoHide(notices);
   }
 
   function getCheckoutContainer() {
@@ -3009,6 +3120,64 @@
             "product_preview",
           );
 
+          // Variable products: seed initial variation from preview payload (defaults)
+          // so prepare checkout doesn't fail with `missing_variation`.
+          if (
+            response.data &&
+            response.data.product &&
+            response.data.product.type === "variable" &&
+            lightCurrentContext
+          ) {
+            var selectedId = response.data.product.selected_variation_id || 0;
+
+            // If API chose an out-of-stock default, pick the first available variation.
+            if (response.data.product.variations && response.data.product.variations.length) {
+              var byId = selectedId
+                ? response.data.product.variations.find(function (v) {
+                    return v && v.id === selectedId;
+                  })
+                : null;
+              if (byId && (byId.is_in_stock === false || byId.is_purchasable === false)) {
+                selectedId = 0;
+              }
+              if (!selectedId) {
+                var firstOk = response.data.product.variations.find(function (v) {
+                  return !!(
+                    v &&
+                    v.id &&
+                    v.is_in_stock !== false &&
+                    v.is_purchasable !== false
+                  );
+                });
+                if (firstOk) {
+                  selectedId = firstOk.id;
+                }
+              }
+            } else if (!selectedId && response.data.product.variations && response.data.product.variations.length === 1) {
+              selectedId = response.data.product.variations[0].id || 0;
+            }
+
+            if (selectedId && !normalizeContext(lightCurrentContext).variation_id) {
+              lightCurrentContext.variationId = selectedId;
+              // Best-effort: capture attributes for the selected variation if present.
+              if (response.data.product.variations && response.data.product.variations.length) {
+                var matchVar = response.data.product.variations.find(function (v) {
+                  return v && v.id === selectedId;
+                });
+                if (matchVar && matchVar.attributes) {
+                  lightCurrentContext.attributes = normalizeVariationAttributesMap(
+                    matchVar.attributes,
+                  );
+                }
+              }
+              setState(
+                { context: normalizeContext(lightCurrentContext) },
+                "seed_variation_from_preview",
+              );
+              prepareCheckout(lightCurrentContext, response.data.coupons || []);
+            }
+          }
+
           // Ensure subtotal/total reflect applied coupons.
           getSubtotal(context, response.data.coupons || [])
             .done(function (sub) {
@@ -3638,7 +3807,20 @@
     }
     const currentState = getState();
 
-    prepareCheckout(lightCurrentContext);
+    // Avoid calling prepare checkout before variable products have a variation.
+    if (
+      currentState &&
+      currentState.product &&
+      currentState.product.product &&
+      currentState.product.product.type === "variable"
+    ) {
+      var ctx = normalizeContext(lightCurrentContext);
+      if (ctx && ctx.variation_id) {
+        prepareCheckout(lightCurrentContext, lightUiState.coupons || []);
+      }
+    } else if (normalizeContext(lightCurrentContext).product_id) {
+      prepareCheckout(lightCurrentContext, lightUiState.coupons || []);
+    }
     fetchWooCheckoutNonce().done(function (nonceResponse) {
       // console.log("[popcart light] Woo nonce response", nonceResponse);
       // injectFieldIntoCheckoutForm("woocommerce-process-checkout-nonce", nonceResponse,{
